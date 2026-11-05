@@ -278,16 +278,13 @@
   const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   let deferredPrompt = null;
 
-  const banner = $('#installBanner');
-  const showBanner = () => { banner.hidden = isStandalone() || LS.get('pv_ib_dismissed', false); };
   async function doInstall() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      if (outcome === 'accepted') { banner.hidden = true; toast('Installing…'); }
-      renderInstallBox();
-    } else openShare();
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    if (outcome === 'accepted') toast('Installing…');
+    renderInstallBox();
   }
   function renderInstallBox() {
     const box = $('#installBox');
@@ -310,11 +307,9 @@
   }
   function openShare() { renderInstallBox(); $('#appLink').textContent = APP_URL; openSheet('#shareSheet'); }
 
-  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; showBanner(); if (!$('#shareSheet').hidden) renderInstallBox(); });
-  window.addEventListener('appinstalled', () => { deferredPrompt = null; banner.hidden = true; toast('App installed'); });
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; if (!$('#shareSheet').hidden) renderInstallBox(); });
+  window.addEventListener('appinstalled', () => { deferredPrompt = null; toast('App installed'); });
   $('#shareAppBtn').onclick = openShare;
-  $('#ibInstall').onclick = doInstall;
-  $('#ibClose').onclick = () => { banner.hidden = true; LS.set('pv_ib_dismissed', true); };
   $('#shClose').onclick = () => closeTop();
   const shareText = 'Pedagadi voter list app – open and tap Install / Add to Home Screen:';
   $('#shShare').onclick = async () => {
@@ -323,8 +318,6 @@
   };
   $('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(APP_URL); toast('Link copied'); } catch { toast(APP_URL); } };
   $('#shWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareText + ' ' + APP_URL), '_blank');
-  showBanner();
-
   drawChips(); render();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
 })();
