@@ -11,8 +11,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=9">
-<style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:8px;flex:none}</style>
+<link rel="stylesheet" href="style.css?v=10">
+<style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
 <header class="top">
@@ -22,6 +22,9 @@
       <p class="sub">పెదగాడి గ్రామ పంచాయతీ · Pendurthi</p>
     </div>
     <div class="hdr-btns">
+    <button id="syncBtn" class="icon-btn sync-btn" aria-label="Sync marks across devices" data-st="off">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19.4 10A7.5 7.5 0 0 0 5.3 8 6 6 0 0 0 6 20h13a5 5 0 0 0 .4-10zM19 18H6a4 4 0 0 1-.4-8l1.1-.1.5-1A5.5 5.5 0 0 1 17.4 10.5l.3 1.5 1.5.1A3 3 0 0 1 19 18z"/></svg><i></i>
+    </button>
     <button id="shareAppBtn" class="icon-btn" aria-label="Share &amp; install app">
       <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M18 16.1c-.8 0-1.5.3-2 .8l-7.1-4.2c.1-.2.1-.5.1-.7s0-.5-.1-.7L16 7.2c.5.5 1.2.8 2 .8 1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 .2 0 .5.1.7L8 9.8C7.5 9.3 6.8 9 6 9c-1.7 0-3 1.3-3 3s1.3 3 3 3c.8 0 1.5-.3 2-.8l7.1 4.2c-.1.2-.1.4-.1.6 0 1.6 1.3 2.9 2.9 2.9s2.9-1.3 2.9-2.9-1.2-2.9-2.8-2.9z"/></svg>
     </button>
@@ -134,9 +137,19 @@
   </div>
 </div>
 
+<!-- Sync sheet -->
+<div class="sheet-backdrop" id="syncSheet" hidden>
+  <div class="sheet" role="dialog" aria-label="Sync marks">
+    <div class="grab"></div>
+    <h2>Sync marks &amp; notes</h2>
+    <div id="syncBody"></div>
+    <div class="sheet-actions"><button class="btn" id="syClose">Close</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="data.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

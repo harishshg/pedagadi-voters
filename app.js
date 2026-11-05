@@ -111,7 +111,7 @@
   function houseHTML(g) {
     const [w, h] = g.key.split('|');
     return `<div class="house"><div class="house-h"><span>Ward ${w} · House ${esc(h)}</span><small>${g.items.length} voter${g.items.length > 1 ? 's' : ''}</small></div>
-      ${g.items.map(v => `<button class="member" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag" style="background:var(--mark)">★</span>' : ''}</div>
+      ${g.items.map(v => `<button class="member" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag star" style="background:var(--mark)">★</span>' : ''}</div>
       <div class="en">${esc(v.name_en)} · ${esc(v.relation)}: ${esc(v.relation_name_en || '—')} · #${v.serial}</div></div></button>`).join('')}</div>`;
   }
 
@@ -281,7 +281,7 @@
         <button class="btn" id="dCopy">Copy</button>
         <button class="btn" id="dShare">Share</button>
       </div>
-      <textarea class="note" id="dNote" placeholder="Private note (saved on this phone only)">${esc(notes[v.id] || '')}</textarea>
+      <textarea class="note" id="dNote" placeholder="${cloud.code ? 'Note (synced with your sync code)' : 'Private note (saved on this phone only)'}">${esc(notes[v.id] || '')}</textarea>
       ${fam.length ? `<h3 style="font-size:13px;color:var(--muted);margin:16px 0 4px;text-transform:uppercase">Same house (${fam.length})</h3>
         <div class="house">${fam.map(x => `<button class="member" data-fam="${x.id}">${photo(x)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(x.name || '—')}</div>${wardPill(x)}</div>
         <div class="en">${esc(x.name_en)} · ${esc(x.relation)}: ${esc(x.relation_name_en || '—')} · #${x.serial}</div></div></button>`).join('')}</div>` : ''}
@@ -289,7 +289,7 @@
     $('#dClose').onclick = () => closeTop();
     $('#dMark').onclick = () => {
       marks.has(v.id) ? marks.delete(v.id) : marks.add(v.id);
-      LS.set('pv_marks', [...marks]); showDetail(v.id, true); toast(marks.has(v.id) ? 'Marked' : 'Unmarked');
+      LS.set('pv_marks', [...marks]); cloud.put('m', v.id, marks.has(v.id) || null); showDetail(v.id, true); toast(marks.has(v.id) ? 'Marked' : 'Unmarked');
       if (S.view !== 'house') { const c = listEl.querySelector(`[data-id="${v.id}"]`); if (c) c.outerHTML = cardHTML(v); }
     };
     $('#dCopy').onclick = async () => { try { await navigator.clipboard.writeText(textOf(v)); toast('Copied'); } catch { toast('Copy not available'); } };
@@ -297,7 +297,7 @@
       if (navigator.share) { try { await navigator.share({ title: v.name_en, text: textOf(v) }); } catch { } }
       else { try { await navigator.clipboard.writeText(textOf(v)); toast('Copied (share not supported)'); } catch { } }
     };
-    $('#dNote').oninput = e => { const val = e.target.value.trim(); if (val) notes[v.id] = val; else delete notes[v.id]; LS.set('pv_notes', notes); };
+    $('#dNote').oninput = e => { const val = e.target.value.trim(); if (val) notes[v.id] = val; else delete notes[v.id]; LS.set('pv_notes', notes); cloud.put('n', v.id, notes[v.id] || null); };
     $('#detail').querySelectorAll('[data-fam]').forEach(b => b.onclick = () => { showDetail(b.dataset.fam, true); $('#detailSheet .sheet').scrollTop = 0; });
     if ($('#dSurname')) $('#dSurname').onclick = () => {
       S.surname = v.surname; S.ward = 0; if (S.view === 'marked') S.view = 'list';
@@ -334,7 +334,7 @@
       <table class="st"><thead><tr><th>Ward</th><th>Voters</th><th>Houses</th><th>BC</th><th>SC</th><th>ST</th><th>—</th></tr></thead>
       <tbody>${rows}<tr class="tot"><td>Total</td><td>${V.length}</td><td>${households.size}</td><td>${c.BC || 0}</td><td>${c.SC || 0}</td><td>${c.ST || 0}</td><td>${c['Not specified'] || 0}</td></tr></tbody></table>
       <p class="photo-status" style="font-size:13px;margin-top:14px">${photoStatusText()}</p>
-      <p style="font-size:12px;color:var(--muted);margin-top:8px">Source: SEC Andhra Pradesh Gram Panchayat electoral roll 2026, published 15-04-2026, age reference date 01-01-2026. Marks and notes are stored only on this device.</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px">Source: SEC Andhra Pradesh Gram Panchayat electoral roll 2026, published 15-04-2026, age reference date 01-01-2026. ${cloud.code ? 'Marks and notes sync across devices that use your sync code.' : 'Marks and notes are stored only on this device. Tap the cloud button to sync them across devices.'}</p>
       <div class="sheet-actions"><button class="btn primary" id="sClose">Close</button></div>`;
     $('#sClose').onclick = () => closeTop();
     $('#stats').querySelectorAll('tr[data-ward]').forEach(tr => tr.onclick = () => { S.ward = +tr.dataset.ward; S.view = 'list'; closeTop(); update(); });
@@ -391,6 +391,167 @@
   };
   $('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(APP_URL); toast('Link copied'); } catch { toast(APP_URL); } };
   $('#shWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareText + ' ' + APP_URL), '_blank');
+  // ---------- cloud sync of marks + notes (Firebase Firestore, REST) ----------
+  // Devices that use the same sync code share one document: lists/<code> { m: {id: true}, n: {id: "note"} }
+  const FIREBASE = { apiKey: '', projectId: '', host: 'https://firestore.googleapis.com' };
+  const cloud = {
+    code: LS.get('pv_sync_code', ''), q: LS.get('pv_sync_q', {}), last: LS.get('pv_sync_last', 0),
+    busy: false, err: '', timer: 0,
+    get ready() { return !!(FIREBASE.apiKey && FIREBASE.projectId); },
+    url(extra = '') {
+      return `${FIREBASE.host}/v1/projects/${FIREBASE.projectId}/databases/(default)/documents/lists/${encodeURIComponent(this.code)}?key=${FIREBASE.apiKey}${extra}`;
+    },
+    // record a change; value null = remove. Changes wait in a queue (kept offline) until sent.
+    put(type, id, val) {
+      if (!this.code) return;
+      this.q[type + ':' + id] = val; LS.set('pv_sync_q', this.q);
+      clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), type === 'n' ? 1200 : 300);
+      drawSyncDot();
+    },
+    async flush() {
+      const keys = Object.keys(this.q);
+      for (let i = 0; i < keys.length; i += 80) {
+        const part = keys.slice(i, i + 80), sent = {};
+        const body = { fields: { m: { mapValue: { fields: {} } }, n: { mapValue: { fields: {} } } } };
+        const mask = part.map(k => {
+          const [t, id] = [k[0], k.slice(2)], val = this.q[k]; sent[k] = val;
+          if (val !== null) body.fields[t].mapValue.fields[id] = t === 'm' ? { booleanValue: true } : { stringValue: String(val) };
+          return 'updateMask.fieldPaths=' + encodeURIComponent(`${t}.\`${id}\``);
+        });
+        const r = await fetch(this.url('&' + mask.join('&')), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!r.ok) throw new Error('save ' + r.status);
+        part.forEach(k => { if (this.q[k] === sent[k]) delete this.q[k]; });
+        LS.set('pv_sync_q', this.q);
+      }
+    },
+    async pull() {
+      const r = await fetch(this.url(), { cache: 'no-store' });
+      if (r.status === 404) return { m: {}, n: {} };
+      if (!r.ok) throw new Error('load ' + r.status);
+      const f = (await r.json()).fields || {};
+      return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {} };
+    },
+    async sync() {
+      if (!this.code || !this.ready || this.busy) return;
+      if (!navigator.onLine) { this.err = 'offline'; drawSyncDot(); return; }
+      this.busy = true; drawSyncDot();
+      try {
+        await this.flush();
+        const d = await this.pull();
+        // the cloud copy wins, except for changes still waiting to be sent
+        const m = new Set(Object.keys(d.m).filter(id => d.m[id].booleanValue)), n = {};
+        Object.keys(d.n).forEach(id => { if (d.n[id].stringValue) n[id] = d.n[id].stringValue; });
+        Object.entries(this.q).forEach(([k, val]) => {
+          const id = k.slice(2);
+          if (k[0] === 'm') val ? m.add(id) : m.delete(id); else if (val) n[id] = val; else delete n[id];
+        });
+        const changed = m.size !== marks.size || [...m].some(id => !marks.has(id));
+        marks.clear(); m.forEach(id => marks.add(id)); LS.set('pv_marks', [...marks]);
+        const editing = document.activeElement && document.activeElement.id === 'dNote';
+        if (!editing) { Object.keys(notes).forEach(k => delete notes[k]); Object.assign(notes, n); LS.set('pv_notes', notes); }
+        if (changed) refreshMarks();
+        this.last = Date.now(); LS.set('pv_sync_last', this.last); this.err = '';
+      } catch (e) { this.err = navigator.onLine ? 'error' : 'offline'; }
+      this.busy = false; drawSyncDot();
+      if (Object.keys(this.q).length && !this.err) this.sync();
+    },
+    join(code) {
+      this.code = code; LS.set('pv_sync_code', code);
+      // add this device's existing marks and notes to the shared list
+      marks.forEach(id => this.q['m:' + id] = true);
+      Object.entries(notes).forEach(([id, val]) => this.q['n:' + id] = val);
+      LS.set('pv_sync_q', this.q);
+      return this.sync();
+    },
+    leave() { this.code = ''; this.q = {}; this.err = ''; LS.set('pv_sync_code', ''); LS.set('pv_sync_q', {}); drawSyncDot(); }
+  };
+  const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const newCode = () => { const a = crypto.getRandomValues(new Uint8Array(8)); return 'PDG-' + [...a].map((x, i) => (i === 4 ? '-' : '') + CODE_CHARS[x % CODE_CHARS.length]).join(''); };
+  // accepts "pdg 5pwy dmbb", "PDG-5PWY-DMBB" or just "5PWYDMBB"
+  const cleanCode = s => {
+    let c = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (c.length === 8) c = 'PDG' + c;
+    return /^PDG[A-Z0-9]{8}$/.test(c) ? `PDG-${c.slice(3, 7)}-${c.slice(7)}` : c;
+  };
+  const validCode = c => /^PDG-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c);
+  const syncLink = () => APP_URL + '#sync=' + cloud.code;
+
+  // update the stars on cards already on screen, without losing the scroll position
+  function refreshMarks() {
+    if (S.view === 'marked') { render(); return; }
+    listEl.querySelectorAll('.card[data-id]').forEach(c => { c.outerHTML = cardHTML(byId.get(c.dataset.id)); });
+    listEl.querySelectorAll('.member[data-id]').forEach(b => {
+      const row = b.querySelector('.nm-row'), star = row.querySelector('.star'), on = marks.has(b.dataset.id);
+      if (on && !star) row.insertAdjacentHTML('beforeend', '<span class="tag star" style="background:var(--mark)">★</span>');
+      if (!on && star) star.remove();
+    });
+  }
+  function ago(t) {
+    const s = Math.round((Date.now() - t) / 1000);
+    return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : new Date(t).toLocaleDateString();
+  }
+  function drawSyncDot() {
+    const b = $('#syncBtn'); if (!b) return;
+    const st = !cloud.code ? 'off' : cloud.busy ? 'busy' : cloud.err ? 'err' : Object.keys(cloud.q).length ? 'busy' : 'ok';
+    b.dataset.st = st;
+    if (!$('#syncSheet').hidden) drawSync();
+  }
+  function drawSync() {
+    const box = $('#syncBody');
+    if (!cloud.ready) {
+      box.innerHTML = `<p>Sync isn't set up yet. The app owner needs to add the Firebase settings.</p>`; return;
+    }
+    if (!cloud.code) {
+      box.innerHTML = `<p class="sync-lead">Marks and notes are saved on this device only. Turn on sync to see the same marks on all your devices.</p>
+        <button class="btn primary w100" id="syNew">Create a sync code</button>
+        <div class="sync-or">or, if you already have a code</div>
+        <div class="sync-join"><input id="syCode" placeholder="PDG-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn" id="syJoin">Join</button></div>
+        <p class="hint">Anyone who has your code can see and change these marks and notes. Share it only with people you trust.</p>`;
+      $('#syNew').onclick = async () => { await cloud.join(newCode()); toast(cloud.err ? 'Saved here, will sync when online' : 'Sync is on'); };
+      $('#syJoin').onclick = async () => {
+        const c = cleanCode($('#syCode').value);
+        if (!validCode(c)) { toast('Code looks like PDG-XXXX-XXXX'); return; }
+        await cloud.join(c); toast(cloud.err ? 'Could not reach the server, will retry' : 'Joined. Marks synced');
+      };
+      return;
+    }
+    const pend = Object.keys(cloud.q).length;
+    const status = cloud.busy ? 'Syncing…' : cloud.err === 'offline' ? `Offline. ${pend} change${pend === 1 ? '' : 's'} will sync when you're back online.`
+      : cloud.err ? 'Could not sync. Will try again.' : pend ? `${pend} change${pend === 1 ? '' : 's'} waiting…` : cloud.last ? `✓ Synced ${ago(cloud.last)} · ${marks.size} marked` : 'Not synced yet';
+    box.innerHTML = `<p class="sync-lead">Sync is on. Use this code on your other devices, or open the link there.</p>
+      <div class="sync-code">${esc(cloud.code)}</div>
+      <p class="sync-status">${status}</p>
+      <div class="share-actions">
+        <button class="btn primary wide" id="syShare">Share code / link</button>
+        <button class="btn" id="syNow">Sync now</button>
+        <button class="btn" id="syCopy">Copy code</button>
+      </div>
+      <p class="hint">Changes sync automatically when you mark someone, open the app, or come back to it. Anyone who has this code can see and change the marks.</p>
+      <button class="btn ghost w100 danger" id="syOff">Stop syncing on this device</button>`;
+    $('#syNow').onclick = () => cloud.sync();
+    $('#syCopy').onclick = async () => { try { await navigator.clipboard.writeText(cloud.code); toast('Code copied'); } catch { toast(cloud.code); } };
+    $('#syShare').onclick = async () => {
+      const text = `Pedagadi Voters sync code: ${cloud.code}\nOpen this link to sync marks:`;
+      if (navigator.share) { try { await navigator.share({ title: 'Sync code', text, url: syncLink() }); } catch { } }
+      else { try { await navigator.clipboard.writeText(text + ' ' + syncLink()); toast('Copied'); } catch { } }
+    };
+    $('#syOff').onclick = () => { if (confirm('Stop syncing on this device? Your marks stay on this device and in the cloud.')) { cloud.leave(); drawSync(); toast('Sync turned off'); } };
+  }
+  $('#syncBtn').onclick = () => { drawSync(); openSheet('#syncSheet'); if (cloud.code) cloud.sync(); };
+  $('#syClose').onclick = () => closeTop();
+  // a shared link like …/#sync=PDG-XXXX-XXXX joins that list
+  const hashCode = cleanCode((location.hash.match(/sync=([^&]+)/) || [])[1]);
+  if (hashCode) {
+    history.replaceState(null, '', location.pathname + location.search);
+    if (hashCode !== cloud.code && cloud.ready && validCode(hashCode) &&
+        confirm(`Sync marks with code ${hashCode}?${cloud.code ? '\nThis replaces your current code ' + cloud.code + '.' : ''}`))
+      cloud.join(hashCode).then(() => toast(cloud.err ? 'Will sync when online' : 'Joined. Marks synced'));
+  }
+  drawSyncDot();
+  cloud.sync();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloud.sync(); });
+  window.addEventListener('online', () => cloud.sync());
+  setInterval(() => { if (document.visibilityState === 'visible') cloud.sync(); }, 60000);
   // ---------- download all photos in the background (for fast scrolling + offline) ----------
   const PHOTO_CACHE = 'pv-photos';
   const photoState = { done: 0, total: V.filter(v => v.photo).length, running: false, finished: false };

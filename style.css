@@ -189,3 +189,20 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .wpill{flex:none;display:inline-block;font-size:11.5px;font-weight:700;line-height:1.5;padding:0 7px;border-radius:999px;background:var(--accent);color:var(--brand);border:1px solid var(--brand);white-space:nowrap}
 @media (prefers-color-scheme:dark){.wpill{color:#cfe3f7;border-color:#4a7fb3}}
 .d-top .wpill{font-size:12.5px;padding:1px 9px}
+
+/* sync */
+.sync-btn{position:relative}
+.sync-btn i{position:absolute;top:7px;right:7px;width:9px;height:9px;border-radius:50%;border:2px solid var(--brand,#1f4e79);display:none}
+.sync-btn[data-st="ok"] i{display:block;background:#4ade80}
+.sync-btn[data-st="busy"] i{display:block;background:#facc15}
+.sync-btn[data-st="err"] i{display:block;background:#f87171}
+.sync-lead{font-size:14px;margin:4px 0 12px}
+.w100{width:100%;display:block}
+.sync-or{text-align:center;font-size:13px;color:var(--muted);margin:14px 0 8px}
+.sync-join{display:flex;gap:8px}
+.sync-join input{flex:1;min-width:0;font:inherit;font-size:16px;letter-spacing:.06em;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:inherit;text-transform:uppercase}
+.sync-join .btn{flex:none;padding:12px 18px}
+.sync-code{font:700 24px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-align:center;background:var(--accent);border-radius:12px;padding:14px 8px;user-select:all;word-break:break-all}
+.sync-status{text-align:center;font-size:13.5px;color:var(--muted);margin:8px 0 12px}
+.btn.danger{color:#c62828;margin-top:12px}
+@media (max-width:359px){.title-row h1{font-size:17px}.hdr-btns .icon-btn{width:36px;height:36px}}
