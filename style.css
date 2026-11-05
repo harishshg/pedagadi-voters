@@ -354,3 +354,7 @@ body.has-selbar main{padding-bottom:80px}
 
 #fsVoters[hidden],#fsSort[hidden]{display:none}
 #closeFilters{flex:2}
+
+.name-only{flex:none;border:1px solid #c9d3df;background:#f3f6fa;color:#475569;border-radius:999px;font:inherit;font-size:12px;font-weight:600;padding:4px 10px;white-space:nowrap;cursor:pointer}
+.name-only.on{background:var(--brand);border-color:transparent;color:#fff}
+@media (max-width:359px){.name-only{padding:4px 7px;font-size:11px}}

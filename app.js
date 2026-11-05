@@ -26,6 +26,11 @@
             phon(v.name_en) + ' ' + phon(v.relation_name_en) +
             (v.alt_en ? ' ' + v.alt_en.split(/\s+/).map(phon).join(' ') : '');   // older spellings still match
     v._house = (v.house_no || '').toLowerCase();
+    // the voter's own name only (for the "Name only" search switch); alt_en lists the name's words first
+    const nw = (v.name_en || '').split(/\s+/).filter(Boolean);
+    v._teN = teNorm(v.name);
+    v._enN = nw.map(phon).join(' ') + ' ' + phon(v.name_en || '') +
+             (v.alt_en ? ' ' + v.alt_en.split(/\s+/).slice(0, nw.length).map(phon).join(' ') : '');
   });
 
   // ---------- state ----------
@@ -40,12 +45,12 @@
   Object.values(FAM).forEach(g => { g.t = g.t || 'family'; g.v = g.v || {}; g.s = g.s || {}; g.x = g.x || {}; });
   const saveFam = () => LS.set('pv_fam', FAM);
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name' }, saved, { q: '' });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false }, saved, { q: '' });
   if (S.view === 'family' && S.gtype === 'caste') S.view = 'caste';  // the old combined Groups tab
   if (saved.group) { if (((LS.get('pv_fam', {})[saved.group]) || {}).t === 'caste') S.cgrp = saved.group; else S.fgrp = saved.group; }
   S.rel = 'all'; S.marked = false;  // relation and "only marked" filters were removed from the panel
   const isGroupView = () => S.view === 'family' || S.view === 'caste';
-  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort });
+  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly });
   // surname index: standard spelling -> { te, en, n }
   const SURNAMES = new Map();
   V.forEach(v => { if (!v.surname) return; const s = SURNAMES.get(v.surname) || { te: v.surname, en: v.surname_en, n: 0 }; s.n++; SURNAMES.set(v.surname, s); });
@@ -80,7 +85,12 @@
     });
     if (raw) {
       const toks = raw.split(/\s+/).filter(Boolean);
-      list = list.filter(v => toks.every(t => {
+      if (S.nameOnly) list = list.filter(v => toks.every(t => {
+        if (isTelugu(t)) return v._teN.includes(teNorm(t));
+        const p = phon(t);
+        return p && v._enN.includes(p);
+      }));
+      else list = list.filter(v => toks.every(t => {
         if (isTelugu(t)) return v._te.includes(teNorm(t));
         const tl = t.toLowerCase();
         if (/^\d+$/.test(t)) return String(v.serial) === t || v._house.startsWith(tl) || v._house.split(/[-/]/).includes(tl) || v.epic.toLowerCase().includes(tl);
@@ -116,7 +126,7 @@
       <div class="body">
         <div class="nm-row"><div class="nm">${hl(v.name || '(name not in list)', S.q)}</div>${wardPill(v)}</div>
         <div class="en">${esc(v.name_en)}</div>
-        <div class="rel">${esc(v.relation)}: ${hl(v.relation_name || '—', S.q)}</div>
+        <div class="rel">${esc(v.relation)}: ${hl(v.relation_name || '—', S.nameOnly ? '' : S.q)}</div>
         <div class="meta"><span>House <b>${esc(v.house_no || '—')}</b></span>
           <span class="tag ${casteCls(v.caste)}">${casteLbl(v.caste)}</span></div>
       </div>
@@ -258,6 +268,14 @@
     $('#clearQ').hidden = !q.value;
     clearTimeout(t); t = setTimeout(() => { S.q = q.value; render(); }, 120);
   });
+  const nameOnlyBtn = $('#nameOnly');
+  const drawNameOnly = () => {
+    nameOnlyBtn.classList.toggle('on', S.nameOnly);
+    nameOnlyBtn.setAttribute('aria-pressed', S.nameOnly);
+    q.placeholder = S.nameOnly ? 'Search voter name only…' : 'Name, father/husband, house no, EPIC, serial…';
+  };
+  nameOnlyBtn.onclick = () => { S.nameOnly = !S.nameOnly; drawNameOnly(); saveState(); render(); toast(S.nameOnly ? 'Searching voter names only' : 'Searching all details'); };
+  drawNameOnly();
   $('#clearQ').onclick = () => { q.value = ''; S.q = ''; $('#clearQ').hidden = true; render(); q.focus(); };
 
   // ---------- sheets (with back-button support) ----------
