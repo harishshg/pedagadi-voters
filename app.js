@@ -210,6 +210,40 @@
   }
   window.addEventListener('popstate', () => { if (ownPops) { ownPops--; return; } hideTop(); });
   document.querySelectorAll('.sheet-backdrop').forEach(bd => bd.addEventListener('click', e => { if (e.target === bd) closeTop(); }));
+  // close (×) button in the top corner + swipe down to close, for every sheet
+  document.querySelectorAll('.sheet').forEach(sh => {
+    const g = sh.querySelector('.grab');
+    const top = document.createElement('div'); top.className = 'sheet-top';
+    top.innerHTML = '<div class="grab"></div><button class="sheet-x" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z" transform="translate(.6 0)"/></svg></button>';
+    g ? g.replaceWith(top) : sh.prepend(top);
+    top.querySelector('.sheet-x').onclick = () => closeTop();
+    let y0 = 0, dy = 0, t0 = 0, drag = false, ok = false;
+    // a drag only closes the sheet when nothing under the finger is scrolled down
+    const atTop = el => { for (; el && el !== sh.parentNode; el = el.parentNode) if (el.scrollTop > 0) return false; return true; };
+    sh.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1) { ok = false; return; }
+      ok = top.contains(e.target) || atTop(e.target);
+      y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); drag = false;
+    }, { passive: true });
+    sh.addEventListener('touchmove', e => {
+      if (!ok) return;
+      const d = e.touches[0].clientY - y0;
+      if (!drag) { if (d > 8) { drag = true; sh.style.transition = 'none'; } else if (d < -4) { ok = false; return; } else return; }
+      dy = Math.max(0, d - 8);
+      sh.style.transform = `translateY(${dy}px)`;
+      e.preventDefault();
+    }, { passive: false });
+    const end = () => {
+      if (!drag) return; drag = false;
+      const fast = dy > 40 && dy / (Date.now() - t0) > 0.5;
+      sh.style.transition = 'transform .2s ease-out';
+      if (dy > Math.min(140, sh.offsetHeight * 0.25) || fast) {
+        sh.style.transform = 'translateY(100%)';
+        setTimeout(() => { closeTop(); sh.style.transition = ''; sh.style.transform = ''; }, 180);
+      } else { sh.style.transform = ''; setTimeout(() => { sh.style.transition = ''; }, 200); }
+    };
+    sh.addEventListener('touchend', end); sh.addEventListener('touchcancel', end);
+  });
   $('#filterBtn').onclick = () => openSheet('#filterSheet');
   $('#closeFilters').onclick = () => closeTop();
   $('#resetFilters').onclick = () => { S.caste = 'all'; S.rel = 'all'; S.sort = 'serial'; S.surname = ''; update(); };

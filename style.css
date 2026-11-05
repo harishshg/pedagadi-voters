@@ -206,3 +206,10 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .sync-status{text-align:center;font-size:13.5px;color:var(--muted);margin:8px 0 12px}
 .btn.danger{color:#c62828;margin-top:12px}
 @media (max-width:359px){.title-row h1{font-size:17px}.hdr-btns .icon-btn{width:36px;height:36px}}
+
+/* sheet header: drag handle + close button, stays visible while the sheet scrolls */
+.sheet-top{position:sticky;top:-8px;z-index:3;background:var(--card);margin:-8px -16px 0;padding:8px 16px 2px;height:40px;box-sizing:border-box;touch-action:none}
+.sheet-top .grab{margin:4px auto 0}
+.sheet-x{position:absolute;top:6px;right:10px;width:34px;height:34px;border-radius:50%;border:0;background:var(--chip);color:var(--ink);display:grid;place-items:center;padding:0;cursor:pointer}
+.sheet h2{padding-right:40px;margin-top:-8px}
+.picker .sheet-top{position:relative;top:0}
