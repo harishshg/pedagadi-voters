@@ -34,9 +34,13 @@
   };
   const marks = new Set(LS.get('pv_marks', []));
   const notes = LS.get('pv_notes', {});
+  // family groups made by the user: { gid: { name, v: { voterId: true } } } (synced with the sync code)
+  const FAM = LS.get('pv_fam', {});
+  Object.values(FAM).forEach(g => { g.t = g.t || 'family'; g.v = g.v || {}; g.s = g.s || {}; g.x = g.x || {}; });
+  const saveFam = () => LS.set('pv_fam', FAM);
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '' }, saved, { q: '' });
-  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all' }, saved, { q: '' });
+  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, group: S.group, gtype: S.gtype });
   // surname index: standard spelling -> { te, en, n }
   const SURNAMES = new Map();
   V.forEach(v => { if (!v.surname) return; const s = SURNAMES.get(v.surname) || { te: v.surname, en: v.surname_en, n: 0 }; s.n++; SURNAMES.set(v.surname, s); });
@@ -61,6 +65,7 @@
     if (S.caste !== 'all') list = list.filter(v => v.caste === S.caste);
     if (S.rel !== 'all') list = list.filter(v => v.relation === S.rel);
     if (S.surname) list = list.filter(v => v.surname === S.surname);
+    if (S.group) { if (FAM[S.group]) { const m = gMembers(S.group); list = list.filter(v => m.has(v.id)); } else S.group = ''; }
     if (raw) {
       const toks = raw.split(/\s+/).filter(Boolean);
       list = list.filter(v => toks.every(t => {
@@ -119,6 +124,15 @@
     current = filtered();
     shown = 0; listEl.innerHTML = '';
     const isHouse = S.view === 'house';
+    if (S.view === 'family') {
+      groups = famGroups();
+      const nv = new Set(groups.flatMap(g => g.items.map(v => v.id))).size;
+      $('#summary').textContent = `${groups.length} group${groups.length === 1 ? '' : 's'} · ${nv.toLocaleString()} voters`;
+      listEl.innerHTML = `<div class="chips wrap g-types" id="gTypeChips">${[['all', 'All'], ['family', '👪 Families'], ['caste', '🏷️ Castes']].map(([k, l]) => `<button class="chip ${S.gtype === k ? 'on' : ''}" data-gt="${k}">${l}</button>`).join('')}</div>
+        <div class="g-new"><button class="btn primary" data-new="family">＋ New family</button><button class="btn primary" data-new="caste">＋ New caste</button></div>` +
+        (groups.length ? '' : `<div class="empty">${Object.keys(FAM).length ? 'No group matches.' : 'No groups yet.<br>Make a family or caste group, or open a voter and tap “Add to group”.'}</div>`);
+      more(); return;
+    }
     if (isHouse) {
       const m = new Map();
       current.forEach(v => { if (!m.has(v.hkey)) m.set(v.hkey, []); m.get(v.hkey).push(v); });
@@ -138,11 +152,11 @@
   }
 
   function more() {
-    const isHouse = S.view === 'house';
-    const src = isHouse ? groups : current;
+    const isHouse = S.view === 'house', isFam = S.view === 'family';
+    const src = isHouse || isFam ? groups : current;
     if (shown >= src.length) return;
-    const chunk = src.slice(shown, shown + (isHouse ? 15 : PAGE));
-    listEl.insertAdjacentHTML('beforeend', chunk.map(isHouse ? houseHTML : cardHTML).join(''));
+    const chunk = src.slice(shown, shown + (isHouse || isFam ? 15 : PAGE));
+    listEl.insertAdjacentHTML('beforeend', chunk.map(isFam ? famHTML : isHouse ? houseHTML : cardHTML).join(''));
     shown += chunk.length;
   }
   new IntersectionObserver(es => { if (es[0].isIntersecting) more(); }, { rootMargin: '600px' }).observe($('#sentinel'));
@@ -159,7 +173,7 @@
     chips($('#relChips'), [['all', 'All'], ['Father', 'Father (తండ్రి)'], ['Husband', 'Husband (భర్త)'], ['Mother', 'Mother (తల్లి)'], ['Not stated', 'Not stated']], S.rel, v => { S.rel = v; update(); });
     chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
     document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.view === S.view));
-    const fc = (S.caste !== 'all') + (S.rel !== 'all') + !!S.surname;
+    const fc = (S.caste !== 'all') + (S.rel !== 'all') + !!S.surname + !!(S.group && FAM[S.group]);
     $('#filterCount').textContent = fc ? fc : '';
     // surname dropdown + active filter chips
     const sn = S.surname && SURNAMES.get(S.surname);
@@ -168,6 +182,7 @@
     sb.classList.toggle('on', !!sn);
     $('#surnameClear').hidden = !sn;
     const af = [];
+    if (S.group && FAM[S.group]) af.push(`<button class="af" data-clear="group">${esc(gLabel(S.group))} <b>×</b></button>`);
     if (sn) af.push(`<button class="af" data-clear="surname">${esc(sn.te)} · ${esc(sn.en)} <b>×</b></button>`);
     if (S.caste !== 'all') af.push(`<button class="af" data-clear="caste">${esc(S.caste)} <b>×</b></button>`);
     if (S.rel !== 'all') af.push(`<button class="af" data-clear="rel">${esc(S.rel)} <b>×</b></button>`);
@@ -175,7 +190,7 @@
   }
   $('#activeFilters').onclick = e => {
     const b = e.target.closest('[data-clear]'); if (!b) return;
-    const k = b.dataset.clear; S[k] = k === 'surname' ? '' : 'all'; update();
+    const k = b.dataset.clear; S[k] = k === 'surname' || k === 'group' ? '' : 'all'; update();
   };
   function update() { saveState(); drawChips(); render(); window.scrollTo({ top: 0 }); }
   document.querySelectorAll('#viewSeg button').forEach(b => b.onclick = () => { S.view = b.dataset.view; update(); });
@@ -193,9 +208,12 @@
   const open = [];
   function openSheet(id) {
     const el = $(id); el.hidden = false; open.push(el);
+    el.style.zIndex = 50 + open.length;  // the newest sheet is always on top
     history.pushState({ sheet: id }, '');
     document.body.style.overflow = 'hidden';
   }
+  // if a sheet is already open further down, close the ones above it instead of opening it twice
+  function raise(id) { const i = open.indexOf($(id)); if (i < 0) return false; closeTop(open.length - 1 - i); return true; }
   // each open sheet owns one history entry, so the phone's Back button closes the top sheet
   let ownPops = 0;
   function hideTop() {
@@ -246,15 +264,15 @@
   });
   $('#filterBtn').onclick = () => openSheet('#filterSheet');
   $('#closeFilters').onclick = () => closeTop();
-  $('#resetFilters').onclick = () => { S.caste = 'all'; S.rel = 'all'; S.sort = 'serial'; S.surname = ''; update(); };
+  $('#resetFilters').onclick = () => { S.caste = 'all'; S.rel = 'all'; S.sort = 'serial'; S.surname = ''; S.group = ''; update(); };
 
   // ---------- surname picker (searchable dropdown) ----------
-  let pickSort = 'count';
+  let pickSort = 'count', pickFor = '';  // pickFor = group id when choosing surnames for a group
   function drawSurnameList() {
     const raw = $('#surnameQ').value.trim();
-    const counts = new Map();
-    // counts follow the ward chosen on the main screen
-    V.forEach(v => { if (v.surname && (!S.ward || v.ward === S.ward)) counts.set(v.surname, (counts.get(v.surname) || 0) + 1); });
+    const counts = new Map(), forG = pickFor && FAM[pickFor];
+    // counts follow the ward chosen on the main screen (whole village when adding to a group)
+    V.forEach(v => { if (v.surname && (forG || !S.ward || v.ward === S.ward)) counts.set(v.surname, (counts.get(v.surname) || 0) + 1); });
     let items = [...counts.entries()].map(([k, n]) => ({ k, n, te: SURNAMES.get(k).te, en: SURNAMES.get(k).en }));
     if (raw) {
       const te = isTelugu(raw), p = phon(raw);
@@ -262,12 +280,20 @@
     }
     items.sort(pickSort === 'az' ? (a, b) => a.en.localeCompare(b.en) : (a, b) => b.n - a.n || a.en.localeCompare(b.en));
     const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    if (forG) {
+      $('#surnameList').innerHTML = items.length ? items.map(s => { const on = !!forG.s[s.k];
+        return `<button class="opt ${on ? 'sel' : ''}" data-s="${esc(s.k)}"><div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(s.te)}</div><div class="o-en">${esc(s.en)}</div></div><span class="o-n">${s.n}</span></button>`; }).join('')
+        : '<div class="empty">No surname matches.</div>';
+      return;
+    }
     const all = raw ? '' : `<button class="opt ${!S.surname ? 'sel' : ''}" data-s=""><div class="o-main"><div class="o-te">All surnames</div><div class="o-en">${counts.size} surnames${S.ward ? ' in Ward ' + S.ward : ''}</div></div><span class="o-n">${total}</span></button>`;
     $('#surnameList').innerHTML = all + (items.length ? items.map(s =>
       `<button class="opt ${s.k === S.surname ? 'sel' : ''}" data-s="${esc(s.k)}" role="option"><div class="o-main"><div class="o-te">${esc(s.te)}</div><div class="o-en">${esc(s.en)}</div></div><span class="o-n">${s.n}</span></button>`).join('')
       : '<div class="empty">No surname matches.</div>');
   }
-  function openSurnamePicker() {
+  function openSurnamePicker(gid) {
+    pickFor = typeof gid === 'string' ? gid : '';
+    $('#surnameSheet h2').textContent = pickFor ? `Add surnames to ${famName(pickFor)}` : 'Choose surname';
     $('#surnameQ').value = '';
     const drawSort = () => chips($('#surnameSort'), [['count', 'Most voters'], ['az', 'A–Z']], pickSort, v => { pickSort = v; drawSort(); drawSurnameList(); });
     drawSort();
@@ -275,11 +301,16 @@
     openSheet('#surnameSheet');
     $('#surnameList').scrollTop = 0;
   }
-  $('#surnameSelect').onclick = openSurnamePicker;
+  $('#surnameSelect').onclick = () => openSurnamePicker();
   $('#surnameClear').onclick = () => { S.surname = ''; update(); };
   $('#surnameQ').addEventListener('input', drawSurnameList);
   $('#surnameList').onclick = e => {
     const b = e.target.closest('[data-s]'); if (!b) return;
+    if (pickFor && FAM[pickFor]) {
+      // choosing surnames for a group: toggle, stay open so several can be picked
+      const on = !FAM[pickFor].s[b.dataset.s]; gSurname(pickFor, b.dataset.s, on);
+      toast(on ? 'Surname added' : 'Surname removed'); drawSurnameList(); showFam(pickFor, true); return;
+    }
     S.surname = b.dataset.s;
     // close the picker (and the filters sheet under it) and show the results
     closeTop(open.length);
@@ -287,12 +318,19 @@
   };
 
   // ---------- detail ----------
+  // "★ Marked by Ravi's phone · 2 h ago" (only for synced lists)
+  function whoLine(t, id) {
+    const w = cloud.code && cloud.who[t + ':' + id]; if (!w || !w.by) return '';
+    const by = w.d === cloud.dev ? 'you (this device)' : w.by;
+    return `<p class="who">${t === 'm' ? '★ Marked' : '✎ Note'} by <b>${esc(by)}</b>${w.t ? ' · ' + ago(w.t) : ''}</p>`;
+  }
   function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => el.hidden = true, 1800); }
   function textOf(v) {
     return `${v.name} (${v.name_en}) – Ward ${v.ward}\n${v.relation}: ${v.relation_name} (${v.relation_name_en})\nWard ${v.ward} · Serial ${v.serial} · House ${v.house_no || '—'}\nEPIC: ${v.epic}\nAC list: 31-${v.ac_part}-${v.ac_serial}`;
   }
   function showDetail(id, replace) {
     const v = byId.get(id); if (!v) return;
+    $('#detailSheet')._vid = id;
     const fam = (households.get(v.hkey) || []).filter(x => x.id !== v.id);
     const marked = marks.has(v.id);
     $('#detail').innerHTML = `
@@ -304,6 +342,7 @@
         <dt>Ward</dt><dd>${v.ward}</dd>
         <dt>Serial no.</dt><dd>${v.serial}</dd>
         <dt>Surname</dt><dd>${v.surname ? `${esc(v.surname)} · ${esc(v.surname_en)}<small><button class="linkish" id="dSurname">See all ${SURNAMES.get(v.surname).n} ${esc(v.surname_en)} voters</button></small>` : '—'}</dd>
+        <dt>Groups</dt><dd class="fam-dd">${Object.keys(FAM).filter(gid => inGroup(gid, v.id)).map(gid => `<button class="fam-chip" data-fam-open="${gid}">${esc(gLabel(gid))}</button>`).join('')}<button class="fam-chip add" id="dFam">＋ Add to group</button></dd>
         <dt>House no.</dt><dd>${esc(v.house_no || '—')}</dd>
         <dt>EPIC no.</dt><dd>${esc(v.epic)}</dd>
         <dt>Caste</dt><dd>${esc(v.caste)}</dd>
@@ -315,7 +354,9 @@
         <button class="btn" id="dCopy">Copy</button>
         <button class="btn" id="dShare">Share</button>
       </div>
+      ${marked ? whoLine('m', v.id) : ''}
       <textarea class="note" id="dNote" placeholder="${cloud.code ? 'Note (synced with your sync code)' : 'Private note (saved on this phone only)'}">${esc(notes[v.id] || '')}</textarea>
+      ${notes[v.id] ? whoLine('n', v.id) : ''}
       ${fam.length ? `<h3 style="font-size:13px;color:var(--muted);margin:16px 0 4px;text-transform:uppercase">Same house (${fam.length})</h3>
         <div class="house">${fam.map(x => `<button class="member" data-fam="${x.id}">${photo(x)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(x.name || '—')}</div>${wardPill(x)}</div>
         <div class="en">${esc(x.name_en)} · ${esc(x.relation)}: ${esc(x.relation_name_en || '—')} · #${x.serial}</div></div></button>`).join('')}</div>` : ''}
@@ -332,15 +373,213 @@
       else { try { await navigator.clipboard.writeText(textOf(v)); toast('Copied (share not supported)'); } catch { } }
     };
     $('#dNote').oninput = e => { const val = e.target.value.trim(); if (val) notes[v.id] = val; else delete notes[v.id]; LS.set('pv_notes', notes); cloud.put('n', v.id, notes[v.id] || null); };
+    $('#dFam').onclick = () => showFamPick(v.id);
+    $('#detail').querySelectorAll('[data-fam-open]').forEach(b => b.onclick = () => showFam(b.dataset.famOpen));
     $('#detail').querySelectorAll('[data-fam]').forEach(b => b.onclick = () => { showDetail(b.dataset.fam, true); $('#detailSheet .sheet').scrollTop = 0; });
     if ($('#dSurname')) $('#dSurname').onclick = () => {
       S.surname = v.surname; S.ward = 0; if (S.view === 'marked') S.view = 'list';
       q.value = ''; S.q = ''; $('#clearQ').hidden = true;
       closeTop(open.length); update();
     };
-    if (!replace) openSheet('#detailSheet');
+    if (!replace && !raise('#detailSheet')) openSheet('#detailSheet');
   }
-  listEl.addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) showDetail(b.dataset.id); });
+  listEl.addEventListener('click', e => {
+    const nw = e.target.closest('[data-new]'); if (nw) { famCreate(nw.dataset.new); return; }
+    const gt = e.target.closest('[data-gt]'); if (gt) { S.gtype = gt.dataset.gt; saveState(); render(); return; }
+    const gl = e.target.closest('[data-fam-list]'); if (gl) { showGroupInList(gl.dataset.famList); return; }
+    const f = e.target.closest('[data-fam-open]'); if (f) { showFam(f.dataset.famOpen); return; }
+    const b = e.target.closest('[data-id]'); if (b) showDetail(b.dataset.id);
+  });
+
+  // ---------- groups: families and castes ----------
+  // A group = voters added one by one (v) + everyone with one of its surnames (s) − voters taken out (x).
+  const rid = () => [...crypto.getRandomValues(new Uint8Array(5))].map(b => b.toString(16).padStart(2, '0')).join('');
+  const GT = { family: { icon: '👪', label: 'Family', plural: 'Families', eg: 'Gotivada family, Ravi’s relatives' },
+               caste: { icon: '🏷️', label: 'Caste', plural: 'Castes', eg: 'Kapu, Yadava, Velama' } };
+  const gType = gid => (FAM[gid] && GT[FAM[gid].t]) ? FAM[gid].t : 'family';
+  const famName = gid => (FAM[gid] && FAM[gid].name) || 'Unnamed group';
+  const gLabel = gid => `${GT[gType(gid)].icon} ${famName(gid)}`;
+  // voter ids of a group, and why each one is in it
+  function gMembers(gid) {
+    const g = FAM[gid], out = new Map(); if (!g) return out;
+    Object.keys(g.s || {}).forEach(sk => V.forEach(v => { if (v.surname === sk && !(g.x || {})[v.id]) out.set(v.id, 'surname'); }));
+    Object.keys(g.v || {}).forEach(id => { if (byId.has(id)) out.set(id, 'added'); });
+    return out;
+  }
+  const inGroup = (gid, vid) => { const g = FAM[gid]; if (!g) return false; const v = byId.get(vid);
+    return !!(g.v[vid] || (v && v.surname && g.s[v.surname] && !g.x[vid])); };
+  function famChanged() { saveFam(); if (S.view === 'family' || S.group) render(); refreshDetailFam(); drawChips(); }
+  function famNew(name, t) { const gid = rid(); FAM[gid] = { name, t, v: {}, s: {}, x: {} }; cloud.put('G', gid, name); cloud.put('T', gid, t); famChanged(); return gid; }
+  // field: 'v' voter, 's' surname, 'x' taken out
+  function gSet(gid, field, key, on) {
+    const g = FAM[gid]; if (!g) return;
+    if (on) g[field][key] = true; else delete g[field][key];
+    cloud.put(field.toUpperCase(), gid + '|' + key, on || null);
+  }
+  function gAddVoter(gid, vid) { gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); famChanged(); }
+  function gRemoveVoter(gid, vid) {
+    const v = byId.get(vid), g = FAM[gid];
+    gSet(gid, 'v', vid, false);
+    if (v && v.surname && g.s[v.surname]) gSet(gid, 'x', vid, true);  // came in through the surname: keep them out
+    famChanged();
+  }
+  function gSurname(gid, sk, on) {
+    gSet(gid, 's', sk, on);
+    // clear per-person exceptions for that surname
+    V.forEach(v => { if (v.surname === sk) { if (FAM[gid].x[v.id]) gSet(gid, 'x', v.id, false); if (on && FAM[gid].v[v.id]) gSet(gid, 'v', v.id, false); } });
+    famChanged();
+  }
+  function famCreate(t, firstVoter) {
+    const v = firstVoter && byId.get(firstVoter);
+    const def = t === 'family' && v ? `${v.surname_en || v.name_en.split(' ').pop()} family` : '';
+    const name = prompt(`Name of the ${GT[t].label.toLowerCase()} group (e.g. ${GT[t].eg}):`, def);
+    if (!name || !name.trim()) return null;
+    const gid = famNew(name.trim().slice(0, 40), t);
+    if (v) gAddVoter(gid, v.id);
+    showFam(gid);
+    return gid;
+  }
+
+  // the Groups tab
+  function famGroups() {
+    const filtering = S.q.trim() || S.ward || S.caste !== 'all' || S.rel !== 'all' || S.surname;
+    const ok = new Set(current.map(v => v.id));
+    return Object.keys(FAM).filter(gid => S.gtype === 'all' || gType(gid) === S.gtype).map(gid => {
+      const all = [...gMembers(gid).keys()];
+      const items = all.filter(id => ok.has(id)).map(id => byId.get(id)).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
+      return { gid, name: famName(gid), t: gType(gid), items, total: all.length };
+    }).filter(g => g.items.length || !filtering).sort((a, b) => a.t.localeCompare(b.t) || a.name.localeCompare(b.name));
+  }
+  function famHTML(g) {
+    const show = g.items.slice(0, 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
+    return `<div class="house fam"><div class="house-h"><span>${GT[g.t].icon} ${esc(g.name)}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
+      <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button></div>
+      ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
+      ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
+      ${more > 0 ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
+  }
+  function memberHTML(v) {
+    return `<button class="member" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag star" style="background:var(--mark)">★</span>' : ''}</div>
+      <div class="en">${esc(v.name_en)} · ${esc(v.relation)}: ${esc(v.relation_name_en || '—')} · #${v.serial}</div></div></button>`;
+  }
+  // show a group's voters in the normal voter list (with all the usual filters and sorting)
+  function showGroupInList(gid) { S.group = gid; S.view = 'list'; closeTop(open.length); update(); }
+
+  // likely relatives for a family: same house, father/husband named in the roll, children/wives who name them
+  const byName = new Map(), byRel = new Map();
+  V.forEach(v => {
+    const a = teNorm(v.name), b = teNorm(v.relation_name);
+    if (a) { if (!byName.has(a)) byName.set(a, []); byName.get(a).push(v); }
+    if (b) { if (!byRel.has(b)) byRel.set(b, []); byRel.get(b).push(v); }
+  });
+  function suggest(gid, mem) {
+    const seen = new Map();
+    // name links (father / husband / child) count more than living at the same address; a shared surname adds a little
+    const add = (y, why, w, x) => {
+      if (mem.has(y.id)) return;
+      const e = seen.get(y.id) || { v: y, why: [], n: 0 }; e.n += w + (x.surname && y.surname === x.surname ? 1 : 0);
+      if (e.why.length < 2 && !e.why.includes(why)) e.why.push(why); seen.set(y.id, e);
+    };
+    const near = (x, y) => y.ward === x.ward || (x.surname && y.surname === x.surname);
+    [...mem.keys()].slice(0, 200).map(id => byId.get(id)).forEach(x => {
+      const who = x.name_en || x.name;
+      (households.get(x.hkey) || []).forEach(y => add(y, `Same house as ${who}`, 1, x));
+      (byRel.get(teNorm(x.name)) || []).forEach(y => { if (near(x, y)) add(y, `${y.relation === 'Husband' ? 'Wife' : 'Child'} of ${who}`, 3, x); });
+      if (x.relation_name) (byName.get(teNorm(x.relation_name)) || []).forEach(y => { if (near(x, y)) add(y, `${x.relation === 'Not stated' ? 'Relative' : x.relation} of ${who}`, 3, x); });
+    });
+    return [...seen.values()].sort((a, b) => b.n - a.n || a.v.ward - b.v.ward || a.v.serial - b.v.serial).slice(0, 30);
+  }
+  // surnames of the group's members that are not in the group yet
+  function suggestSurnames(gid, mem) {
+    const g = FAM[gid], c = new Map();
+    [...mem.keys()].forEach(id => { const v = byId.get(id); if (v.surname && !g.s[v.surname]) c.set(v.surname, (c.get(v.surname) || 0) + 1); });
+    return [...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k]) => k);
+  }
+  const snLabel = k => { const s = SURNAMES.get(k); return s ? `${s.te} · ${s.en}` : k; };
+
+  function showFam(gid, replace) {
+    if (!FAM[gid]) { toast('This group was deleted'); return; }
+    const g = FAM[gid], t = gType(gid); $('#famSheet')._gid = gid;
+    const memMap = gMembers(gid);
+    const mem = [...memMap.keys()].map(id => byId.get(id)).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
+    const wards = {}; mem.forEach(v => wards[v.ward] = (wards[v.ward] || 0) + 1);
+    const sn = Object.keys(g.s), xs = Object.keys(g.x).map(id => byId.get(id)).filter(Boolean);
+    const sug = t === 'family' ? suggest(gid, memMap) : [];
+    const sugSn = suggestSurnames(gid, memMap);
+    const LIMIT = 60;
+    const row = (v, extra, btn) => `<div class="fam-row"><button class="member" data-open="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(v.name || '—')}</div>${wardPill(v)}</div>
+      <div class="en">${esc(v.name_en)} · ${extra}</div></div></button>${btn}</div>`;
+    $('#fam').innerHTML = `<h2>${GT[t].icon} ${esc(famName(gid))}</h2>
+      <p class="fam-sub">${GT[t].label} group · ${mem.length.toLocaleString()} voter${mem.length === 1 ? '' : 's'}${mem.length ? ' · ' + Object.keys(wards).sort((a, b) => a - b).map(w => `W${w}: ${wards[w]}`).join(', ') : ''}</p>
+      <div class="d-actions"><button class="btn" id="fShow">Show in list</button><button class="btn" id="fRename">Rename</button><button class="btn danger" id="fDelete">Delete</button></div>
+      <h3>Surnames in this group</h3>
+      <div class="fam-dd">${sn.map(k => `<span class="fam-chip sn">${esc(snLabel(k))} <small>${SURNAMES.get(k) ? SURNAMES.get(k).n : ''}</small><button data-sn-rm="${esc(k)}" aria-label="Remove surname">×</button></span>`).join('')}
+        <button class="fam-chip add" id="fAddSn">＋ Add surname</button></div>
+      <p class="hint">${sn.length ? 'Everyone with these surnames is in the group.' : 'Add a surname to include everyone with it — useful for castes.'}</p>
+      ${sugSn.length ? `<div class="fam-dd sugg">${sugSn.map(k => `<button class="fam-chip add" data-sn-add="${esc(k)}">＋ ${esc(snLabel(k))} (${SURNAMES.get(k) ? SURNAMES.get(k).n : ''})</button>`).join('')}</div><p class="hint">Surnames of people already in the group.</p>` : ''}
+      <h3>Members (${mem.length.toLocaleString()})</h3>
+      ${mem.length ? `<div class="house">${mem.slice(0, LIMIT).map(v => row(v, `${memMap.get(v.id) === 'surname' ? '<span class="why">via surname</span> · ' : ''}${esc(v.relation)}: ${esc(v.relation_name_en || '—')}`,
+        `<button class="fam-act rm" data-rm="${v.id}" aria-label="Take ${esc(v.name_en)} out">×</button>`)).join('')}</div>
+        ${mem.length > LIMIT ? `<button class="btn w100" id="fShow2" style="margin-top:8px">Show all ${mem.length.toLocaleString()} in the voter list</button>` : ''}`
+        : '<p class="hint">No voters yet. Add a surname above, or open any voter and tap “Add to group”.</p>'}
+      ${xs.length ? `<h3>Taken out (${xs.length})</h3><div class="house">${xs.map(v => row(v, 'has a group surname but is not in the group', `<button class="fam-act add" data-readd="${v.id}" aria-label="Put back">＋</button>`)).join('')}</div>` : ''}
+      ${t === 'family' ? `<h3>Suggested relatives</h3>
+      ${sug.length ? `<div class="house">${sug.map(e => row(e.v, `<span class="why">${esc(e.why.join(' · '))}</span>`,
+        `<button class="fam-act add" data-add="${e.v.id}" aria-label="Add ${esc(e.v.name_en)}">＋</button>`)).join('')}</div>`
+        : `<p class="hint">${mem.length ? 'No more suggestions.' : 'Add one voter first, and the app will suggest their relatives.'}</p>`}
+      <p class="hint">Suggestions come from the same house and from the father / husband names in the roll, so check them before adding.</p>` : ''}
+      <div class="sheet-actions"><button class="btn primary" id="fClose">Close</button></div>`;
+    const box = $('#fam');
+    box.querySelector('#fClose').onclick = () => closeTop();
+    box.querySelector('#fShow').onclick = () => showGroupInList(gid);
+    if (box.querySelector('#fShow2')) box.querySelector('#fShow2').onclick = () => showGroupInList(gid);
+    box.querySelector('#fRename').onclick = () => {
+      const n = prompt('New name for this group:', g.name); if (!n || !n.trim()) return;
+      g.name = n.trim().slice(0, 40); cloud.put('G', gid, g.name); famChanged(); showFam(gid, true);
+    };
+    box.querySelector('#fDelete').onclick = () => {
+      if (!confirm(`Delete the group "${famName(gid)}"? The voters are not deleted.`)) return;
+      delete FAM[gid]; cloud.put('G', gid, null); if (S.group === gid) S.group = ''; famChanged(); closeTop(); toast('Group deleted');
+    };
+    box.querySelector('#fAddSn').onclick = () => openSurnamePicker(gid);
+    box.querySelectorAll('[data-sn-rm]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snRm, false); showFam(gid, true); });
+    box.querySelectorAll('[data-sn-add]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snAdd, true); toast('Surname added'); showFam(gid, true); });
+    box.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { gRemoveVoter(gid, b.dataset.rm); showFam(gid, true); });
+    box.querySelectorAll('[data-readd]').forEach(b => b.onclick = () => { gAddVoter(gid, b.dataset.readd); showFam(gid, true); });
+    box.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { gAddVoter(gid, b.dataset.add); toast('Added'); showFam(gid, true); });
+    box.querySelectorAll('[data-open]').forEach(b => b.onclick = () => showDetail(b.dataset.open));
+    if (!replace && !raise('#famSheet')) openSheet('#famSheet');
+  }
+  // "Add to group" from a voter's details
+  function showFamPick(vid, again) {
+    const v = byId.get(vid), sk = v.surname, sn = sk && SURNAMES.get(sk);
+    const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
+    const rowP = gid => { const on = inGroup(gid, vid); return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
+      <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : 'Add'}</span></button>`; };
+    $('#famPick').innerHTML = `<h2>Add to group</h2><p class="fam-sub">${esc(v.name)} · ${esc(v.name_en)}</p>
+      <div class="d-actions"><button class="btn primary" id="fpNewF">＋ New family</button><button class="btn primary" id="fpNewC">＋ New caste</button></div>
+      ${list.length ? `<h3>Add this person</h3><div class="picker-list fp-list">${list.map(rowP).join('')}</div>` : ''}
+      ${list.length && sn ? `<h3>Add everyone named ${esc(sn.en)} (${sn.n})</h3><div class="fam-dd">${list.map(gid => FAM[gid].s[sk]
+        ? `<button class="fam-chip" data-gs="${gid}">✓ ${esc(gLabel(gid))}</button>` : `<button class="fam-chip add" data-gs="${gid}">＋ ${esc(gLabel(gid))}</button>`).join('')}</div>
+        <p class="hint">Adds the whole surname to the group, including people added to the roll later.</p>` : ''}
+      <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
+    const box = $('#famPick');
+    box.querySelector('#fpClose').onclick = () => closeTop();
+    box.querySelector('#fpNewF').onclick = () => { closeTop(); setTimeout(() => famCreate('family', vid), 60); };
+    box.querySelector('#fpNewC').onclick = () => { closeTop(); setTimeout(() => famCreate('caste', vid), 60); };
+    box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
+      const gid = b.dataset.g, on = !inGroup(gid, vid);
+      on ? gAddVoter(gid, vid) : gRemoveVoter(gid, vid);
+      toast(on ? `Added to ${famName(gid)}` : `Removed from ${famName(gid)}`); showFamPick(vid, true);
+    });
+    box.querySelectorAll('[data-gs]').forEach(b => b.onclick = () => {
+      const gid = b.dataset.gs, on = !FAM[gid].s[sk];
+      gSurname(gid, sk, on); toast(on ? `All ${sn.en} added to ${famName(gid)}` : `${sn.en} removed from ${famName(gid)}`); showFamPick(vid, true);
+    });
+    if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
+  }
+  // keep the voter details up to date when a group changes underneath it
+  const refreshDetailFam = () => { const d = $('#detailSheet'); if (!d.hidden && d._vid) showDetail(d._vid, true); };
 
   // ---------- stats ----------
   const COLORS = { BC: 'var(--bc)', SC: 'var(--sc)', ST: 'var(--st)', 'Not specified': 'var(--ns)' };
@@ -431,7 +670,13 @@
   const cloud = {
     code: LS.get('pv_sync_code', ''), q: LS.get('pv_sync_q', {}), last: LS.get('pv_sync_last', 0),
     busy: false, err: '', timer: 0, hist: LS.get('pv_sync_hist', []),
-    owners: LS.get('pv_owner', {}), meta: { name: '', owner: '' },
+    owners: LS.get('pv_owner', {}), meta: { name: '', owner: '' }, online: 0, others: [],
+    // who marked / wrote each note: { 'm:1-5': { by, d, t } } (honour system: each device names itself)
+    who: LS.get('pv_who', {}), devName: LS.get('pv_devname', ''),
+    get myName() { return this.devName || `${isIOS ? 'iPhone' : isAndroid ? 'Android phone' : 'Computer'} ${this.dev.slice(0, 4)}`; },
+    setDevName(v) { this.devName = String(v || '').trim().slice(0, 30); LS.set('pv_devname', this.devName); },
+    // random id for this device, used only to count devices that are online
+    dev: LS.get('pv_dev', '') || (() => { const d = [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, '0')).join(''); LS.set('pv_dev', d); return d; })(),
     get ready() { return !!(FIREBASE.apiKey && FIREBASE.projectId); },
     url(extra = '', code = this.code) {
       return `${FIREBASE.host}/v1/projects/${FIREBASE.projectId}/databases/(default)/documents/lists/${encodeURIComponent(code)}?key=${FIREBASE.apiKey}${extra}`;
@@ -439,7 +684,13 @@
     // record a change; value null = remove. Changes wait in a queue (kept offline) until sent.
     put(type, id, val) {
       if (!this.code) return;
+      // deleting a family group drops any member changes for it that are still waiting
+      if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TVSX]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
       this.q[type + ':' + id] = val; LS.set('pv_sync_q', this.q);
+      if (type === 'm' || type === 'n') {
+        if (val === null) delete this.who[type + ':' + id]; else this.who[type + ':' + id] = { by: this.myName, d: this.dev, t: Date.now() };
+        LS.set('pv_who', this.who);
+      }
       clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), type === 'n' ? 1200 : 300);
       drawSyncDot();
     },
@@ -447,11 +698,27 @@
       const keys = Object.keys(this.q);
       for (let i = 0; i < keys.length; i += 80) {
         const part = keys.slice(i, i + 80), sent = {};
-        const body = { fields: { m: { mapValue: { fields: {} } }, n: { mapValue: { fields: {} } } } };
-        const mask = part.map(k => {
+        const F = () => ({ mapValue: { fields: {} } });
+        const body = { fields: { m: F(), n: F(), mb: F(), nb: F(), g: F() } };
+        const path = parts => 'updateMask.fieldPaths=' + encodeURIComponent(parts.map((x, i) => i % 2 ? '`' + x + '`' : x).join('.'));
+        const mask = part.flatMap(k => {
           const [t, id] = [k[0], k.slice(2)], val = this.q[k]; sent[k] = val;
-          if (val !== null) body.fields[t].mapValue.fields[id] = t === 'm' ? { booleanValue: true } : { stringValue: String(val) };
-          return 'updateMask.fieldPaths=' + encodeURIComponent(`${t}.\`${id}\``);
+          // groups: g.<gid>.name, g.<gid>.t, and g.<gid>.v / .s / .x .<key> (voters, surnames, taken out)
+          if ('GTVSX'.includes(t)) {
+            const [gid, key] = id.split('|'), gf = body.fields.g.mapValue.fields;
+            if (t === 'G' && val === null) return [path(['g', gid])];
+            const grp = gf[gid] || (gf[gid] = { mapValue: { fields: { v: F(), s: F(), x: F() } } });
+            if (t === 'G' || t === 'T') { const f = t === 'G' ? 'name' : 't'; grp.mapValue.fields[f] = { stringValue: String(val) }; return [path(['g', gid, f])]; }
+            const f = t.toLowerCase();
+            if (val !== null) grp.mapValue.fields[f].mapValue.fields[key] = { booleanValue: true };
+            return [path(['g', gid, f, key])];
+          }
+          if (val !== null) {
+            body.fields[t].mapValue.fields[id] = t === 'm' ? { booleanValue: true } : { stringValue: String(val) };
+            const w = this.who[k] || { by: this.myName, d: this.dev, t: Date.now() };
+            body.fields[t + 'b'].mapValue.fields[id] = { mapValue: { fields: { by: { stringValue: w.by }, d: { stringValue: w.d }, t: { integerValue: String(w.t) } } } };
+          }
+          return [`${t}.\`${id}\``, `${t}b.\`${id}\``].map(f => 'updateMask.fieldPaths=' + encodeURIComponent(f));
         });
         const r = await fetch(this.url('&' + mask.join('&')), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!r.ok) throw new Error('save ' + r.status);
@@ -461,11 +728,47 @@
     },
     async pull(code = this.code) {
       const r = await fetch(this.url('', code), { cache: 'no-store' });
-      if (r.status === 404) return { m: {}, n: {}, name: '', owner: '' };
+      if (r.status === 404) return { m: {}, n: {}, name: '', owner: '', p: {}, who: {}, g: {} };
       if (!r.ok) throw new Error('load ' + r.status);
-      const f = (await r.json()).fields || {};
+      return this.parse(await r.json());
+    },
+    parse(doc) {
+      const f = doc.fields || {};
       const str = k => (f[k] && f[k].stringValue) || '';
-      return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {}, name: str('name'), owner: str('owner') };
+      const p = {}; Object.entries((f.p && f.p.mapValue.fields) || {}).forEach(([k, v]) => {
+        const g = (v.mapValue && v.mapValue.fields) || {};
+        p[k] = v.mapValue ? { t: +((g.t && g.t.integerValue) || 0), nm: (g.nm && g.nm.stringValue) || '' } : { t: +(v.integerValue || 0), nm: '' };
+      });
+      const who = {};
+      ['m', 'n'].forEach(t => Object.entries((f[t + 'b'] && f[t + 'b'].mapValue.fields) || {}).forEach(([id, v]) => {
+        const g = (v.mapValue && v.mapValue.fields) || {};
+        who[t + ':' + id] = { by: (g.by && g.by.stringValue) || '', d: (g.d && g.d.stringValue) || '', t: +((g.t && g.t.integerValue) || 0) };
+      }));
+      const g = {};
+      Object.entries((f.g && f.g.mapValue.fields) || {}).forEach(([gid, x]) => {
+        const gf = (x.mapValue && x.mapValue.fields) || {};
+        const set = k => { const o = {}; Object.entries((gf[k] && gf[k].mapValue && gf[k].mapValue.fields) || {}).forEach(([id, b]) => { if (b.booleanValue) o[id] = true; }); return o; };
+        g[gid] = { name: (gf.name && gf.name.stringValue) || '', t: (gf.t && gf.t.stringValue) || 'family', v: set('v'), s: set('s'), x: set('x') };
+      });
+      return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {}, name: str('name'), owner: str('owner'), p, who, g };
+    },
+    // "I'm here": write this device's last-seen time and read the list back in the same request.
+    // Entries older than 10 minutes are removed along the way.
+    async beat() {
+      const now = Date.now(), stale = Object.keys(this.p || {}).filter(k => k !== this.dev && now - this.p[k].t > 600000);
+      const mask = [this.dev, ...stale].map(k => 'updateMask.fieldPaths=' + encodeURIComponent(`p.\`${k}\``)).join('&');
+      const r = await fetch(this.url('&' + mask), { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { p: { mapValue: { fields: { [this.dev]: { mapValue: { fields: { t: { integerValue: String(now) }, nm: { stringValue: this.myName } } } } } } } } }) });
+      if (!r.ok) return this.pull();  // e.g. rules not updated yet: still sync marks
+      return this.parse(await r.json());
+    },
+    // tell a list this device has gone (closing the app, switching codes); best effort
+    bye(code = this.code) {
+      if (!code || !this.ready) return;
+      try {
+        fetch(this.url('&updateMask.fieldPaths=' + encodeURIComponent(`p.\`${this.dev}\``), code), { method: 'PATCH', keepalive: true,
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { p: { mapValue: { fields: {} } } } }) }).catch(() => { });
+      } catch { }
     },
     async sync() {
       if (!this.code || !this.ready || this.busy) return;
@@ -473,7 +776,7 @@
       this.busy = true; drawSyncDot();
       try {
         await this.flush();
-        this.apply(await this.pull());
+        this.apply(document.visibilityState === 'visible' ? await this.beat() : await this.pull());
         this.last = Date.now(); LS.set('pv_sync_last', this.last); this.err = '';
         this.remember(this.code);
       } catch (e) { this.err = navigator.onLine ? 'error' : 'offline'; }
@@ -483,6 +786,14 @@
     // make this device's marks and notes match the cloud copy (plus changes not yet sent)
     apply(d) {
       this.meta = { name: d.name, owner: d.owner };
+      // devices seen in the last 2.5 minutes (each open app checks in every minute)
+      this.p = d.p || {}; const now = Date.now();
+      const live = Object.entries(this.p).filter(([k, v]) => k !== this.dev && now - v.t < 150000);
+      this.others = live.map(([k, v]) => v.nm || 'Device ' + k.slice(0, 4));
+      this.online = live.length + 1;  // this device + the others
+      // attribution from the cloud, except for this device's changes not yet sent
+      const who = Object.assign({}, d.who || {}); Object.keys(this.q).forEach(k => { if (this.who[k]) who[k] = this.who[k]; else delete who[k]; });
+      this.who = who; LS.set('pv_who', who);
       const h = this.hist.find(h => h.code === this.code);
       if (h && h.name !== d.name) { h.name = d.name; LS.set('pv_sync_hist', this.hist); }
       // the cloud copy wins, except for changes still waiting to be sent
@@ -490,13 +801,29 @@
       Object.keys(d.n).forEach(id => { if (d.n[id].stringValue) n[id] = d.n[id].stringValue; });
       Object.entries(this.q).forEach(([k, val]) => {
         const id = k.slice(2);
-        if (k[0] === 'm') val ? m.add(id) : m.delete(id); else if (val) n[id] = val; else delete n[id];
+        if (k[0] === 'm') val ? m.add(id) : m.delete(id); else if (k[0] === 'n') { if (val) n[id] = val; else delete n[id]; }
       });
       const changed = m.size !== marks.size || [...m].some(id => !marks.has(id));
       marks.clear(); m.forEach(id => marks.add(id)); LS.set('pv_marks', [...marks]);
       const editing = document.activeElement && document.activeElement.id === 'dNote';
       if (!editing) { Object.keys(notes).forEach(k => delete notes[k]); Object.assign(notes, n); LS.set('pv_notes', notes); }
       if (changed) refreshMarks();
+      // family groups: cloud copy + changes still waiting to be sent
+      const g = JSON.parse(JSON.stringify(d.g || {}));
+      Object.entries(this.q).forEach(([k, val]) => {
+        const t = k[0]; if (!'GTVSX'.includes(t)) return;
+        const [gid, key] = k.slice(2).split('|');
+        if (t === 'G' && val === null) { delete g[gid]; return; }
+        const grp = g[gid] = g[gid] || { name: '', t: 'family', v: {}, s: {}, x: {} };
+        if (t === 'G') grp.name = val; else if (t === 'T') grp.t = val;
+        else { const f = t.toLowerCase(); if (val) grp[f][key] = true; else delete grp[f][key]; }
+      });
+      if (JSON.stringify(g) !== JSON.stringify(FAM)) {
+        Object.keys(FAM).forEach(k => delete FAM[k]); Object.assign(FAM, g); saveFam();
+        if (S.view === 'family' || S.group) render();
+        drawChips();
+        if (!$('#famSheet').hidden && $('#famSheet')._gid) { if (FAM[$('#famSheet')._gid]) showFam($('#famSheet')._gid, true); }
+      }
     },
     // codes used on this device, newest first
     remember(c) {
@@ -545,7 +872,8 @@
       if (old && Object.keys(this.q).length) { try { await this.flush(); } catch { } }
       try {
         this.code = c;
-        const d = await this.pull();
+        const d = await this.beat();
+        if (old) this.bye(old);
         this.q = {}; LS.set('pv_sync_q', {}); LS.set('pv_sync_code', c);
         const dn = $('#dNote'); if (dn) dn.blur();
         this.apply(d);
@@ -564,13 +892,23 @@
       // add this device's existing marks and notes to the shared list
       marks.forEach(id => this.q['m:' + id] = true);
       Object.entries(notes).forEach(([id, val]) => this.q['n:' + id] = val);
+      Object.entries(FAM).forEach(([gid, g]) => {
+        this.q['G:' + gid] = g.name; this.q['T:' + gid] = g.t || 'family';
+        ['v', 's', 'x'].forEach(f => Object.keys(g[f] || {}).forEach(k => this.q[f.toUpperCase() + ':' + gid + '|' + k] = true));
+      });
       LS.set('pv_sync_q', this.q);
       return this.sync();
     },
-    leave() { this.remember(this.code); this.code = ''; this.q = {}; this.err = ''; LS.set('pv_sync_code', ''); LS.set('pv_sync_q', {}); drawSyncDot(); }
+    leave() { this.bye(); this.online = 0; this.others = []; this.remember(this.code); this.code = ''; this.q = {}; this.err = ''; LS.set('pv_sync_code', ''); LS.set('pv_sync_q', {}); drawSyncDot(); }
   };
   const sha256 = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
   const randomSecret = () => [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
+  // ask once for a device name, so others see who marked (e.g. "Ravi's phone")
+  function askDevName(force) {
+    if (cloud.devName && !force) return;
+    const v = prompt('Name this device so others can see who marked a voter (e.g. Ravi\'s phone):', cloud.devName);
+    if (v !== null && v.trim()) cloud.setDevName(v);
+  }
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const newCode = () => { const a = crypto.getRandomValues(new Uint8Array(8)); return 'PDG-' + [...a].map((x, i) => (i === 4 ? '-' : '') + CODE_CHARS[x % CODE_CHARS.length]).join(''); };
   // accepts "pdg 5pwy dmbb", "PDG-5PWY-DMBB" or just "5PWYDMBB"
@@ -600,6 +938,10 @@
     const b = $('#syncBtn'); if (!b) return;
     const st = !cloud.code ? 'off' : cloud.busy ? 'busy' : cloud.err ? 'err' : Object.keys(cloud.q).length ? 'busy' : 'ok';
     b.dataset.st = st;
+    const n = cloud.code && cloud.online > 1 ? cloud.online : 0;
+    let badge = b.querySelector('.sync-n'); if (!badge) { badge = document.createElement('b'); badge.className = 'sync-n'; b.appendChild(badge); }
+    badge.textContent = n || ''; badge.hidden = !n;
+    b.setAttribute('aria-label', 'Sync marks across devices' + (n ? ` (${n} devices online)` : ''));
     if (!$('#syncSheet').hidden) drawSync();
   }
   function drawSync() {
@@ -640,6 +982,7 @@
       bindRecent();
       $('#syNew').onclick = async () => {
         const c = newCode();
+        askDevName();
         await cloud.join(c);
         // claim the new code for this device, so only it can name the list
         const v = prompt('Sync is on. Give this list a name (optional), e.g. Family or Ward 3 team:', '');
@@ -651,6 +994,7 @@
       $('#syJoin').onclick = async () => {
         const c = cleanCode($('#syCode').value);
         if (!validCode(c)) { toast('Code looks like PDG-XXXX-XXXX'); return; }
+        askDevName();
         await cloud.join(c); toast(cloud.err ? 'Could not reach the server, will retry' : 'Joined. Marks synced');
       };
       return;
@@ -664,6 +1008,9 @@
         : cloud.nameOf(cloud.code) ? `<div class="sync-name">${esc(cloud.nameOf(cloud.code))}</div>` : ''}
       <div class="sync-code">${esc(cloud.code)}</div>
       <p class="sync-status">${status}</p>
+      ${cloud.online ? `<div class="sync-online"><p><i></i>${cloud.online === 1 ? 'Only this device is online now' : `${cloud.online} devices online now`}</p>
+        ${cloud.others.length ? `<p class="who-list">${['You', ...cloud.others].map(esc).join(' · ')}</p>` : ''}</div>` : ''}
+      <button class="dev-name" id="syDev">This device: <b>${esc(cloud.myName)}</b> <span>✎</span></button>
       <div class="share-actions">
         <button class="btn primary wide" id="syShare">Share code / link</button>
         <button class="btn" id="syNow">Sync now</button>
@@ -674,6 +1021,7 @@
       <button class="btn ghost w100 danger" id="syOff">Stop syncing on this device</button>`;
     bindRecent();
     $('#syNow').onclick = () => cloud.sync();
+    $('#syDev').onclick = () => { askDevName(true); drawSync(); cloud.sync(); };
     $('#syCopy').onclick = async () => { try { await navigator.clipboard.writeText(cloud.code); toast('Code copied'); } catch { toast(cloud.code); } };
     $('#syShare').onclick = async () => {
       const text = `Pedagadi Voters sync code: ${cloud.code}\nOpen this link to sync marks:`;
@@ -690,11 +1038,13 @@
     history.replaceState(null, '', location.pathname + location.search);
     if (hashCode !== cloud.code && cloud.ready && validCode(hashCode) &&
         confirm(`Sync marks with code ${hashCode}?${cloud.code ? '\nThis replaces your current code ' + cloud.code + '.' : ''}`))
-      cloud.join(hashCode).then(() => toast(cloud.err ? 'Will sync when online' : 'Joined. Marks synced'));
+      (askDevName(), cloud.join(hashCode)).then(() => toast(cloud.err ? 'Will sync when online' : 'Joined. Marks synced'));
   }
   drawSyncDot();
   cloud.sync();
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloud.sync(); });
+  // check in again shortly after start: a sign-off sent by the page before a reload can arrive late
+  setTimeout(() => cloud.sync(), 6000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloud.sync(); else cloud.bye(); });
   window.addEventListener('online', () => cloud.sync());
   setInterval(() => { if (document.visibilityState === 'visible') cloud.sync(); }, 60000);
   // ---------- download all photos in the background (for fast scrolling + offline) ----------

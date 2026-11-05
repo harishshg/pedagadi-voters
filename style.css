@@ -211,7 +211,7 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .sheet-top{position:sticky;top:-8px;z-index:3;background:var(--card);margin:-8px -16px 0;padding:8px 16px 2px;height:40px;box-sizing:border-box;touch-action:none}
 .sheet-top .grab{margin:4px auto 0}
 .sheet-x{position:absolute;top:6px;right:10px;width:34px;height:34px;border-radius:50%;border:0;background:var(--chip);color:var(--ink);display:grid;place-items:center;padding:0;cursor:pointer}
-.sheet h2{padding-right:40px;margin-top:-8px}
+.sheet h2{padding-right:40px;margin-top:2px}
 .picker .sheet-top{position:relative;top:0}
 
 .recent{border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -229,3 +229,49 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .rc-name{font-family:inherit!important;letter-spacing:0!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rc-code{font-family:ui-monospace,Menlo,monospace}
 .rc-ed{font-size:17px}
+
+.sync-n{position:absolute;bottom:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#fff;color:var(--brand,#1f4e79);font-size:11px;line-height:16px;font-weight:800;text-align:center}
+.sync-n[hidden]{display:none}
+.sync-online{text-align:center;margin:-4px 0 10px}
+.sync-online p{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:600;margin:0}
+.sync-online .who-list{display:block;font-weight:400;font-size:13px;color:var(--muted);margin-top:4px}
+.sync-online i{width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.2)}
+.sync-online small{font-weight:400;color:var(--muted)}
+
+.dev-name{display:block;margin:0 auto 12px;background:none;border:0;color:var(--muted);font:inherit;font-size:13px}
+.dev-name b{color:var(--ink)}
+.who{font-size:12.5px;color:var(--muted);margin:6px 2px 0}
+.who b{color:var(--ink);font-weight:600}
+
+/* family groups */
+.fam-dd{display:flex;flex-wrap:wrap;gap:6px}
+.fam-chip{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:4px 10px;font:inherit;font-size:13px;font-weight:600}
+.fam-chip.add{background:none;border-style:dashed;color:var(--brand)}
+.fam .house-h{gap:8px}
+.fam .house-h span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fam-open{border:0;background:var(--brand);color:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;font-weight:600;flex:none}
+.fam-empty{padding:12px;font-size:13px;color:var(--muted)}
+.fam-new{margin-bottom:12px}
+.fam-sub{font-size:13px;color:var(--muted);margin:-4px 0 10px}
+.fam-row{display:flex;align-items:stretch;border-top:1px solid var(--line)}
+.fam-row:first-child{border-top:0}
+.fam-row .member{flex:1;min-width:0;border-top:0}
+.fam-act{flex:none;width:48px;border:0;border-left:1px solid var(--line);background:none;font-size:22px;color:var(--muted)}
+.fam-act.add{color:var(--brand);font-weight:700}
+.why{color:var(--brand)}
+.fp-list{margin:0;max-height:50vh;border:1px solid var(--line);border-radius:12px;padding:0}
+.btn.danger{color:#c62828}
+.d-actions .btn.danger{margin-top:0}
+
+.g-types{margin:0 0 8px}
+.g-sn{padding:6px 12px;font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--line)}
+.g-more{display:block;width:100%;border:0;border-top:1px solid var(--line);background:none;color:var(--brand);font:inherit;font-size:13.5px;font-weight:600;padding:10px}
+.fam-chip.sn{display:inline-flex;align-items:center;gap:4px;padding-right:4px}
+.fam-chip.sn small{color:var(--muted);font-weight:400}
+.fam-chip.sn button{border:0;background:none;color:var(--muted);font-size:16px;padding:0 4px;line-height:1}
+.sugg{margin-top:8px}
+.g-new{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.g-new .btn{padding:11px 6px;font-size:14.5px;white-space:nowrap}
+.g-types .chip{border-color:var(--line);color:var(--ink);background:var(--chip)}
+.g-types .chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+@media (max-width:374px){.seg button{padding:6px 7px;font-size:12.5px}.filter-btn{padding-left:9px;padding-right:9px}.toolbar{gap:6px}}

@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=16">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -42,7 +42,8 @@
   <div class="toolbar">
     <div class="seg" id="viewSeg">
       <button data-view="list" class="on">Voters</button>
-      <button data-view="house">Households</button>
+      <button data-view="house">Houses</button>
+      <button data-view="family">Groups</button>
       <button data-view="marked">Marked</button>
     </div>
     <button id="filterBtn" class="filter-btn">Filters<span id="filterCount"></span></button>
@@ -103,6 +104,22 @@
   </div>
 </div>
 
+<!-- Family group sheet -->
+<div class="sheet-backdrop" id="famSheet" hidden>
+  <div class="sheet tall" role="dialog" aria-label="Family group">
+    <div class="grab"></div>
+    <div id="fam"></div>
+  </div>
+</div>
+
+<!-- Add to family sheet -->
+<div class="sheet-backdrop" id="famPickSheet" hidden>
+  <div class="sheet" role="dialog" aria-label="Add to family">
+    <div class="grab"></div>
+    <div id="famPick"></div>
+  </div>
+</div>
+
 <!-- Stats sheet -->
 <div class="sheet-backdrop" id="statsSheet" hidden>
   <div class="sheet tall" role="dialog" aria-label="Statistics">
@@ -149,7 +166,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=14"></script>
-<script src="app.js?v=14"></script>
+<script src="data.js?v=16"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>
