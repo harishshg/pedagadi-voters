@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="te">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79">
+<meta name="robots" content="noindex, nofollow, noimageindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pedagadi Voters">
+<title>Pedagadi Voters</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="title-row">
+    <div>
+      <h1>Pedagadi Voters 2026</h1>
+      <p class="sub">పెదగాడి గ్రామ పంచాయతీ · Pendurthi</p>
+    </div>
+    <button id="statsBtn" class="icon-btn" aria-label="Statistics">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 20h4V10H4v10zm6 0h4V4h-4v16zm6 0h4v-7h-4v7z"/></svg>
+    </button>
+  </div>
+  <div class="search">
+    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+    <input id="q" type="search" placeholder="Name, father/husband, house no, EPIC, serial…" autocomplete="off" enterkeyhint="search">
+    <button id="clearQ" class="clear" aria-label="Clear" hidden>×</button>
+  </div>
+  <div class="chips" id="wardChips"></div>
+  <div class="toolbar">
+    <div class="seg" id="viewSeg">
+      <button data-view="list" class="on">Voters</button>
+      <button data-view="house">Households</button>
+      <button data-view="marked">Marked</button>
+    </div>
+    <button id="filterBtn" class="filter-btn">Filters<span id="filterCount"></span></button>
+  </div>
+</header>
+
+<main>
+  <div id="summary" class="summary"></div>
+  <div id="list" class="list"></div>
+  <div id="sentinel"></div>
+</main>
+
+<!-- Filters sheet -->
+<div class="sheet-backdrop" id="filterSheet" hidden>
+  <div class="sheet" role="dialog" aria-label="Filters">
+    <div class="grab"></div>
+    <h2>Filters &amp; sort</h2>
+    <h3>Caste category</h3>
+    <div class="chips wrap" id="casteChips"></div>
+    <h3>Relation</h3>
+    <div class="chips wrap" id="relChips"></div>
+    <h3>Sort by</h3>
+    <div class="chips wrap" id="sortChips"></div>
+    <div class="sheet-actions">
+      <button id="resetFilters" class="btn ghost">Reset</button>
+      <button id="closeFilters" class="btn primary">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail sheet -->
+<div class="sheet-backdrop" id="detailSheet" hidden>
+  <div class="sheet tall" role="dialog" aria-label="Voter details">
+    <div class="grab"></div>
+    <div id="detail"></div>
+  </div>
+</div>
+
+<!-- Stats sheet -->
+<div class="sheet-backdrop" id="statsSheet" hidden>
+  <div class="sheet tall" role="dialog" aria-label="Statistics">
+    <div class="grab"></div>
+    <div id="stats"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
