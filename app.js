@@ -393,7 +393,7 @@
   $('#shWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareText + ' ' + APP_URL), '_blank');
   // ---------- cloud sync of marks + notes (Firebase Firestore, REST) ----------
   // Devices that use the same sync code share one document: lists/<code> { m: {id: true}, n: {id: "note"} }
-  const FIREBASE = { apiKey: '', projectId: '', host: 'https://firestore.googleapis.com' };
+  const FIREBASE = { apiKey: 'AIzaSyBeWCjXWcZqS9C_hxuLTW_lKljXutuY4gU', projectId: 'voter-list-552ea', host: 'https://firestore.googleapis.com' };
   const cloud = {
     code: LS.get('pv_sync_code', ''), q: LS.get('pv_sync_q', {}), last: LS.get('pv_sync_last', 0),
     busy: false, err: '', timer: 0,
