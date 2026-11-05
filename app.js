@@ -43,6 +43,7 @@
   const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name' }, saved, { q: '' });
   if (S.view === 'family' && S.gtype === 'caste') S.view = 'caste';  // the old combined Groups tab
   if (saved.group) { if (((LS.get('pv_fam', {})[saved.group]) || {}).t === 'caste') S.cgrp = saved.group; else S.fgrp = saved.group; }
+  S.rel = 'all'; S.marked = false;  // relation and "only marked" filters were removed from the panel
   const isGroupView = () => S.view === 'family' || S.view === 'caste';
   const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort });
   // surname index: standard spelling -> { te, en, n }
@@ -201,7 +202,6 @@
     const wards = [[0, 'All wards']].concat([...Array(10)].map((_, i) => [i + 1, `Ward ${i + 1}`]));
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
-    chips($('#relChips'), [['all', 'All'], ['Father', 'Father (తండ్రి)'], ['Husband', 'Husband (భర్త)'], ['Mother', 'Mother (తల్లి)'], ['Not stated', 'Not stated']], S.rel, v => { S.rel = v; update(); });
     chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
     document.querySelectorAll('#viewSeg button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view));
     // Houses and Marked live in the More menu; the More button shows which one is open
@@ -341,7 +341,6 @@
       <p class="hint">The filters below narrow down the people shown in each ${GT[v].label.toLowerCase()}.</p>` : '';
     $('#fsCaste').innerHTML = castes.length && v !== 'caste' ? `<h3>Caste group</h3>${chipRow('cgrp', [['', 'Any'], ['none', 'Not in a caste'], ...castes.map(gid => [gid, '🏷️ ' + esc(famName(gid))])], S.cgrp)}` : '';
     $('#fsFamily').innerHTML = fams.length && v !== 'family' ? `<h3>Family</h3>${chipRow('fgrp', [['', 'Any'], ['none', 'Not in a family'], ...fams.map(gid => [gid, '👪 ' + esc(famName(gid))])], S.fgrp)}` : '';
-    $('#fsMarked').innerHTML = v === 'marked' ? '' : `<h3>Marked</h3>${chipRow('marked', [['', 'Everyone'], ['1', `★ Only marked (${marks.size})`]], S.marked ? '1' : '')}`;
     $('#fsSort').hidden = !(v === 'list' || v === 'marked');
     const n = isSn || isG || v === 'house' ? groups.length : current.length;
     const what = isSn ? 'surname' : isG ? GT[v].label.toLowerCase() : v === 'house' ? 'house' : 'voter';
