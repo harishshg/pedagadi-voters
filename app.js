@@ -496,7 +496,16 @@
     // codes used on this device, newest first
     remember(c) {
       if (!c) return;
-      this.hist = [{ code: c, t: Date.now() }].concat(this.hist.filter(h => h.code !== c)).slice(0, 12);
+      const name = this.nameOf(c);
+      this.hist = [{ code: c, t: Date.now(), name }].concat(this.hist.filter(h => h.code !== c)).slice(0, 12);
+      LS.set('pv_sync_hist', this.hist);
+    },
+    // a name for each code (e.g. "Family", "Ward 3 team"), saved on this device only
+    nameOf(c) { const h = this.hist.find(h => h.code === c); return (h && h.name) || ''; },
+    setName(c, name) {
+      name = String(name || '').trim().slice(0, 40);
+      const h = this.hist.find(h => h.code === c);
+      if (h) h.name = name; else this.hist.unshift({ code: c, t: Date.now(), name });
       LS.set('pv_sync_hist', this.hist);
     },
     forget(c) { this.hist = this.hist.filter(h => h.code !== c); LS.set('pv_sync_hist', this.hist); },
@@ -572,17 +581,27 @@
     }
     const recent = cloud.hist.filter(h => h.code !== cloud.code);
     const recentHTML = recent.length ? `<h3>Recent codes on this device</h3>
-      <div class="recent">${recent.map(h => `<div class="rc-row"><button class="rc-open" data-code="${esc(h.code)}"><b>${esc(h.code)}</b><small>Last used ${ago(h.t)}</small></button>
+      <div class="recent">${recent.map(h => `<div class="rc-row"><button class="rc-open" data-code="${esc(h.code)}">${h.name
+        ? `<b class="rc-name">${esc(h.name)}</b><small><span class="rc-code">${esc(h.code)}</span> · last used ${ago(h.t)}</small>`
+        : `<b>${esc(h.code)}</b><small>Last used ${ago(h.t)}</small>`}</button>
+        <button class="rc-x rc-ed" data-rename="${esc(h.code)}" aria-label="Rename ${esc(h.code)}">✎</button>
         <button class="rc-x" data-forget="${esc(h.code)}" aria-label="Remove ${esc(h.code)} from this list">×</button></div>`).join('')}</div>
       <p class="hint">Opening a recent code replaces the marks and notes on this device with that code's saved copy.</p>` : '';
     const bindRecent = () => box.querySelectorAll('.rc-open').forEach(b => b.onclick = async () => {
-      const c = b.dataset.code;
-      if (!confirm(`Open ${c}?\nMarks and notes on this device will be replaced by the ones saved under ${c}.`)) return;
+      const c = b.dataset.code, label = cloud.nameOf(c) ? `"${cloud.nameOf(c)}" (${c})` : c;
+      if (!confirm(`Open ${label}?\nMarks and notes on this device will be replaced by the ones saved under this code.`)) return;
       b.disabled = true;
-      if (await cloud.switchTo(c)) toast(`Switched to ${c} · ${marks.size} marked`);
+      if (await cloud.switchTo(c)) toast(`Switched to ${cloud.nameOf(c) || c} · ${marks.size} marked`);
       drawSync();
     });
-    box.onclick = e => { const x = e.target.closest('[data-forget]'); if (x) { cloud.forget(x.dataset.forget); drawSync(); } };
+    const rename = c => {
+      const v = prompt(`Name for ${c} (e.g. Family, Ward 3 team):`, cloud.nameOf(c));
+      if (v !== null) { cloud.setName(c, v); drawSync(); }
+    };
+    box.onclick = e => {
+      const x = e.target.closest('[data-forget]'); if (x) { cloud.forget(x.dataset.forget); drawSync(); return; }
+      const r = e.target.closest('[data-rename]'); if (r) rename(r.dataset.rename);
+    };
     if (!cloud.code) {
       box.innerHTML = `<p class="sync-lead">Marks and notes are saved on this device only. Turn on sync to see the same marks on all your devices.</p>
         <button class="btn primary w100" id="syNew">Create a sync code</button>
@@ -602,6 +621,7 @@
     const status = cloud.busy ? 'Syncing…' : cloud.err === 'offline' ? `Offline. ${pend} change${pend === 1 ? '' : 's'} will sync when you're back online.`
       : cloud.err ? 'Could not sync. Will try again.' : pend ? `${pend} change${pend === 1 ? '' : 's'} waiting…` : cloud.last ? `✓ Synced ${ago(cloud.last)} · ${marks.size} marked` : 'Not synced yet';
     box.innerHTML = `<p class="sync-lead">Sync is on. Use this code on your other devices, or open the link there.</p>
+      <button class="sync-name ${cloud.nameOf(cloud.code) ? '' : 'empty'}" data-rename="${esc(cloud.code)}">${cloud.nameOf(cloud.code) ? esc(cloud.nameOf(cloud.code)) : 'Add a name for this list'} <span>✎</span></button>
       <div class="sync-code">${esc(cloud.code)}</div>
       <p class="sync-status">${status}</p>
       <div class="share-actions">
