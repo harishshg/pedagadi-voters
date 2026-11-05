@@ -431,9 +431,10 @@
   const cloud = {
     code: LS.get('pv_sync_code', ''), q: LS.get('pv_sync_q', {}), last: LS.get('pv_sync_last', 0),
     busy: false, err: '', timer: 0, hist: LS.get('pv_sync_hist', []),
+    owners: LS.get('pv_owner', {}), meta: { name: '', owner: '' },
     get ready() { return !!(FIREBASE.apiKey && FIREBASE.projectId); },
-    url(extra = '') {
-      return `${FIREBASE.host}/v1/projects/${FIREBASE.projectId}/databases/(default)/documents/lists/${encodeURIComponent(this.code)}?key=${FIREBASE.apiKey}${extra}`;
+    url(extra = '', code = this.code) {
+      return `${FIREBASE.host}/v1/projects/${FIREBASE.projectId}/databases/(default)/documents/lists/${encodeURIComponent(code)}?key=${FIREBASE.apiKey}${extra}`;
     },
     // record a change; value null = remove. Changes wait in a queue (kept offline) until sent.
     put(type, id, val) {
@@ -458,12 +459,13 @@
         LS.set('pv_sync_q', this.q);
       }
     },
-    async pull() {
-      const r = await fetch(this.url(), { cache: 'no-store' });
-      if (r.status === 404) return { m: {}, n: {} };
+    async pull(code = this.code) {
+      const r = await fetch(this.url('', code), { cache: 'no-store' });
+      if (r.status === 404) return { m: {}, n: {}, name: '', owner: '' };
       if (!r.ok) throw new Error('load ' + r.status);
       const f = (await r.json()).fields || {};
-      return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {} };
+      const str = k => (f[k] && f[k].stringValue) || '';
+      return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {}, name: str('name'), owner: str('owner') };
     },
     async sync() {
       if (!this.code || !this.ready || this.busy) return;
@@ -480,6 +482,9 @@
     },
     // make this device's marks and notes match the cloud copy (plus changes not yet sent)
     apply(d) {
+      this.meta = { name: d.name, owner: d.owner };
+      const h = this.hist.find(h => h.code === this.code);
+      if (h && h.name !== d.name) { h.name = d.name; LS.set('pv_sync_hist', this.hist); }
       // the cloud copy wins, except for changes still waiting to be sent
       const m = new Set(Object.keys(d.m).filter(id => d.m[id].booleanValue)), n = {};
       Object.keys(d.n).forEach(id => { if (d.n[id].stringValue) n[id] = d.n[id].stringValue; });
@@ -496,17 +501,38 @@
     // codes used on this device, newest first
     remember(c) {
       if (!c) return;
-      const name = this.nameOf(c);
+      const name = c === this.code ? this.meta.name : this.nameOf(c);
       this.hist = [{ code: c, t: Date.now(), name }].concat(this.hist.filter(h => h.code !== c)).slice(0, 12);
       LS.set('pv_sync_hist', this.hist);
     },
-    // a name for each code (e.g. "Family", "Ward 3 team"), saved on this device only
-    nameOf(c) { const h = this.hist.find(h => h.code === c); return (h && h.name) || ''; },
-    setName(c, name) {
+    // each list's name is stored in the cloud; only the device that created the code can change it
+    nameOf(c) { if (c === this.code && this.meta.name) return this.meta.name; const h = this.hist.find(h => h.code === c); return (h && h.name) || ''; },
+    // this device can rename: it holds the creator secret, or the list has no owner yet (made before names existed)
+    canRename(c) { return !!this.owners[c] || (c === this.code && !this.meta.owner); },
+    async rename(c, name) {
       name = String(name || '').trim().slice(0, 40);
-      const h = this.hist.find(h => h.code === c);
-      if (h) h.name = name; else this.hist.unshift({ code: c, t: Date.now(), name });
-      LS.set('pv_sync_hist', this.hist);
+      if (!navigator.onLine) { toast('Connect to the internet to rename'); return false; }
+      try {
+        const doc = await this.pull(c);
+        let o = this.owners[c] || null;
+        if (doc.owner && o) {
+          // a previous rename may have been saved without the reply arriving: then the new secret is the valid one
+          if (o.next && await sha256(o.next) === doc.owner) o = { cur: o.next };
+          else if (!o.cur || await sha256(o.cur) !== doc.owner) o = null;
+        }
+        if (doc.owner && !o) { toast('Only the person who created this code can rename it'); return false; }
+        const next = randomSecret();
+        this.owners[c] = { cur: o ? o.cur : '', next }; LS.set('pv_owner', this.owners);
+        const fields = { name: { stringValue: name }, owner: { stringValue: await sha256(next) } }, mask = ['name', 'owner'];
+        if (doc.owner) { fields.key = { stringValue: o.cur }; mask.push('key'); }
+        const r = await fetch(this.url('&' + mask.map(k => 'updateMask.fieldPaths=' + k).join('&'), c),
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+        if (!r.ok) { toast(r.status === 403 ? 'Only the person who created this code can rename it' : 'Could not rename. Try again.'); return false; }
+        this.owners[c] = { cur: next }; LS.set('pv_owner', this.owners);
+        if (c === this.code) this.meta = { name, owner: fields.owner.stringValue };
+        const h = this.hist.find(h => h.code === c); if (h) { h.name = name; LS.set('pv_sync_hist', this.hist); }
+        return true;
+      } catch { toast('Could not rename. Try again.'); return false; }
     },
     forget(c) { this.hist = this.hist.filter(h => h.code !== c); LS.set('pv_sync_hist', this.hist); },
     // open a recent code: this device's marks are replaced by that list's cloud copy (not merged)
@@ -543,6 +569,8 @@
     },
     leave() { this.remember(this.code); this.code = ''; this.q = {}; this.err = ''; LS.set('pv_sync_code', ''); LS.set('pv_sync_q', {}); drawSyncDot(); }
   };
+  const sha256 = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  const randomSecret = () => [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const newCode = () => { const a = crypto.getRandomValues(new Uint8Array(8)); return 'PDG-' + [...a].map((x, i) => (i === 4 ? '-' : '') + CODE_CHARS[x % CODE_CHARS.length]).join(''); };
   // accepts "pdg 5pwy dmbb", "PDG-5PWY-DMBB" or just "5PWYDMBB"
@@ -584,7 +612,7 @@
       <div class="recent">${recent.map(h => `<div class="rc-row"><button class="rc-open" data-code="${esc(h.code)}">${h.name
         ? `<b class="rc-name">${esc(h.name)}</b><small><span class="rc-code">${esc(h.code)}</span> · last used ${ago(h.t)}</small>`
         : `<b>${esc(h.code)}</b><small>Last used ${ago(h.t)}</small>`}</button>
-        <button class="rc-x rc-ed" data-rename="${esc(h.code)}" aria-label="Rename ${esc(h.code)}">✎</button>
+        ${cloud.owners[h.code] ? `<button class="rc-x rc-ed" data-rename="${esc(h.code)}" aria-label="Rename ${esc(h.code)}">✎</button>` : ''}
         <button class="rc-x" data-forget="${esc(h.code)}" aria-label="Remove ${esc(h.code)} from this list">×</button></div>`).join('')}</div>
       <p class="hint">Opening a recent code replaces the marks and notes on this device with that code's saved copy.</p>` : '';
     const bindRecent = () => box.querySelectorAll('.rc-open').forEach(b => b.onclick = async () => {
@@ -594,9 +622,10 @@
       if (await cloud.switchTo(c)) toast(`Switched to ${cloud.nameOf(c) || c} · ${marks.size} marked`);
       drawSync();
     });
-    const rename = c => {
+    const rename = async c => {
       const v = prompt(`Name for ${c} (e.g. Family, Ward 3 team):`, cloud.nameOf(c));
-      if (v !== null) { cloud.setName(c, v); drawSync(); }
+      if (v !== null && await cloud.rename(c, v)) toast(v.trim() ? 'Name saved' : 'Name removed');
+      drawSync();
     };
     box.onclick = e => {
       const x = e.target.closest('[data-forget]'); if (x) { cloud.forget(x.dataset.forget); drawSync(); return; }
@@ -609,7 +638,16 @@
         <div class="sync-join"><input id="syCode" placeholder="PDG-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn" id="syJoin">Join</button></div>
         <p class="hint">Anyone who has your code can see and change these marks and notes. Share it only with people you trust.</p>${recentHTML}`;
       bindRecent();
-      $('#syNew').onclick = async () => { await cloud.join(newCode()); toast(cloud.err ? 'Saved here, will sync when online' : 'Sync is on'); };
+      $('#syNew').onclick = async () => {
+        const c = newCode();
+        await cloud.join(c);
+        // claim the new code for this device, so only it can name the list
+        const v = prompt('Sync is on. Give this list a name (optional), e.g. Family or Ward 3 team:', '');
+        await cloud.rename(c, v || '');
+        cloud.remember(c);
+        toast(cloud.err ? 'Saved here, will sync when online' : 'Sync is on');
+        drawSync();
+      };
       $('#syJoin').onclick = async () => {
         const c = cleanCode($('#syCode').value);
         if (!validCode(c)) { toast('Code looks like PDG-XXXX-XXXX'); return; }
@@ -621,7 +659,9 @@
     const status = cloud.busy ? 'Syncing…' : cloud.err === 'offline' ? `Offline. ${pend} change${pend === 1 ? '' : 's'} will sync when you're back online.`
       : cloud.err ? 'Could not sync. Will try again.' : pend ? `${pend} change${pend === 1 ? '' : 's'} waiting…` : cloud.last ? `✓ Synced ${ago(cloud.last)} · ${marks.size} marked` : 'Not synced yet';
     box.innerHTML = `<p class="sync-lead">Sync is on. Use this code on your other devices, or open the link there.</p>
-      <button class="sync-name ${cloud.nameOf(cloud.code) ? '' : 'empty'}" data-rename="${esc(cloud.code)}">${cloud.nameOf(cloud.code) ? esc(cloud.nameOf(cloud.code)) : 'Add a name for this list'} <span>✎</span></button>
+      ${cloud.canRename(cloud.code)
+        ? `<button class="sync-name ${cloud.nameOf(cloud.code) ? '' : 'empty'}" data-rename="${esc(cloud.code)}">${cloud.nameOf(cloud.code) ? esc(cloud.nameOf(cloud.code)) : 'Add a name for this list'} <span>✎</span></button>`
+        : cloud.nameOf(cloud.code) ? `<div class="sync-name">${esc(cloud.nameOf(cloud.code))}</div>` : ''}
       <div class="sync-code">${esc(cloud.code)}</div>
       <p class="sync-status">${status}</p>
       <div class="share-actions">
