@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -62,18 +62,24 @@
 <div class="sheet-backdrop" id="filterSheet" hidden>
   <div class="sheet" role="dialog" aria-label="Filters">
     <div class="grab"></div>
-    <h2>Filters &amp; sort</h2>
-    <h3>Surname (ఇంటి పేరు)</h3>
-    <div class="select-row">
-      <button id="surnameSelect" class="select-btn" aria-haspopup="listbox"></button>
-      <button id="surnameClear" class="select-x" aria-label="Clear surname" hidden>×</button>
+    <h2 id="fsTitle">Filters &amp; sort</h2>
+    <div id="fsSurnames"></div>
+    <div id="fsGroupSort"></div>
+    <div id="fsVoters">
+      <h3>Surname (ఇంటి పేరు)</h3>
+      <div class="select-row">
+        <button id="surnameSelect" class="select-btn" aria-haspopup="listbox"></button>
+        <button id="surnameClear" class="select-x" aria-label="Clear surname" hidden>×</button>
+      </div>
+      <div id="fsCaste"></div>
+      <div id="fsFamily"></div>
+      <h3>Category in the roll</h3>
+      <div class="chips wrap" id="casteChips"></div>
+      <h3>Relation</h3>
+      <div class="chips wrap" id="relChips"></div>
+      <div id="fsMarked"></div>
+      <div id="fsSort"><h3>Sort by</h3><div class="chips wrap" id="sortChips"></div></div>
     </div>
-    <h3>Caste category</h3>
-    <div class="chips wrap" id="casteChips"></div>
-    <h3>Relation</h3>
-    <div class="chips wrap" id="relChips"></div>
-    <h3>Sort by</h3>
-    <div class="chips wrap" id="sortChips"></div>
     <div class="sheet-actions">
       <button id="resetFilters" class="btn ghost">Reset</button>
       <button id="closeFilters" class="btn primary">Done</button>
@@ -180,7 +186,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=20"></script>
-<script src="app.js?v=20"></script>
+<script src="data.js?v=21"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>

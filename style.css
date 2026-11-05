@@ -351,3 +351,6 @@ body.has-selbar main{padding-bottom:80px}
 .more-menu button.on{background:var(--accent)}
 @media (max-width:419px){.seg button{padding:6px 6px}.toolbar{gap:6px}}
 @media (max-width:339px){.seg button{padding:6px 4px;font-size:11.5px}}
+
+#fsVoters[hidden],#fsSort[hidden]{display:none}
+#closeFilters{flex:2}
