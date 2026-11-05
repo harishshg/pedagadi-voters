@@ -20,9 +20,14 @@
       <h1>Pedagadi Voters 2026</h1>
       <p class="sub">పెదగాడి గ్రామ పంచాయతీ · Pendurthi</p>
     </div>
+    <div class="hdr-btns">
+    <button id="shareAppBtn" class="icon-btn" aria-label="Share &amp; install app">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M18 16.1c-.8 0-1.5.3-2 .8l-7.1-4.2c.1-.2.1-.5.1-.7s0-.5-.1-.7L16 7.2c.5.5 1.2.8 2 .8 1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 .2 0 .5.1.7L8 9.8C7.5 9.3 6.8 9 6 9c-1.7 0-3 1.3-3 3s1.3 3 3 3c.8 0 1.5-.3 2-.8l7.1 4.2c-.1.2-.1.4-.1.6 0 1.6 1.3 2.9 2.9 2.9s2.9-1.3 2.9-2.9-1.2-2.9-2.8-2.9z"/></svg>
+    </button>
     <button id="statsBtn" class="icon-btn" aria-label="Statistics">
       <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M4 20h4V10H4v10zm6 0h4V4h-4v16zm6 0h4v-7h-4v7z"/></svg>
     </button>
+    </div>
   </div>
   <div class="search">
     <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
@@ -41,6 +46,12 @@
 </header>
 
 <main>
+  <div id="installBanner" class="install-banner" hidden>
+    <img src="icon-192.png" alt="">
+    <div class="ib-text"><b>Install this app</b><span>Opens from your home screen, works offline</span></div>
+    <button id="ibInstall" class="ib-btn">Install</button>
+    <button id="ibClose" class="ib-x" aria-label="Dismiss">×</button>
+  </div>
   <div id="summary" class="summary"></div>
   <div id="list" class="list"></div>
   <div id="sentinel"></div>
@@ -77,6 +88,25 @@
   <div class="sheet tall" role="dialog" aria-label="Statistics">
     <div class="grab"></div>
     <div id="stats"></div>
+  </div>
+</div>
+
+<!-- Share & install sheet -->
+<div class="sheet-backdrop" id="shareSheet" hidden>
+  <div class="sheet tall" role="dialog" aria-label="Share and install">
+    <div class="grab"></div>
+    <h2>Share &amp; install</h2>
+    <div id="installBox" class="install-box"></div>
+    <h3>Share with friends</h3>
+    <div class="qr-wrap"><img src="qr.svg" alt="QR code for the app link" class="qr"></div>
+    <p class="link-line" id="appLink"></p>
+    <div class="d-actions">
+      <button class="btn primary" id="shShare">Share link</button>
+      <button class="btn" id="shCopy">Copy link</button>
+      <button class="btn" id="shWa">WhatsApp</button>
+    </div>
+    <p class="hint">Friends scan the QR code with their phone camera, or open the link you send. iPhone users must open it in <b>Safari</b> to install.</p>
+    <div class="sheet-actions"><button class="btn" id="shClose">Close</button></div>
   </div>
 </div>
 

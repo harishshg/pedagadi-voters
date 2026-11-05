@@ -268,6 +268,63 @@
     openSheet('#statsSheet');
   };
 
+  // ---------- share & install ----------
+  const APP_URL = 'https://harishshg.github.io/pedagadi-voters/';
+  const ua = navigator.userAgent;
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /android/i.test(ua);
+  const inAppBrowser = /FBAN|FBAV|Instagram|WhatsApp|Line\/|Snapchat|; wv\)/i.test(ua);
+  const iosNotSafari = isIOS && (/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua) || inAppBrowser);
+  const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  let deferredPrompt = null;
+
+  const banner = $('#installBanner');
+  const showBanner = () => { banner.hidden = isStandalone() || LS.get('pv_ib_dismissed', false); };
+  async function doInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (outcome === 'accepted') { banner.hidden = true; toast('Installing…'); }
+      renderInstallBox();
+    } else openShare();
+  }
+  function renderInstallBox() {
+    const box = $('#installBox');
+    const share = '<span class="kbd">Share ⬆︎</span>';
+    if (isStandalone()) { box.innerHTML = '✓ <b>Installed.</b> You are using the app.'; return; }
+    if (deferredPrompt) {
+      box.innerHTML = `<b>Install on this device</b><div>Adds an app icon to your home screen. Works offline.</div><button class="btn primary" id="ibDo">Install app</button>`;
+      $('#ibDo').onclick = doInstall; return;
+    }
+    if (iosNotSafari) {
+      box.innerHTML = `<b>Open in Safari to install</b><ol><li>Tap <b>Copy link</b> below</li><li>Open <b>Safari</b> and paste the link</li><li>Tap ${share} → <b>Add to Home Screen</b></li></ol>`; return;
+    }
+    if (isIOS) {
+      box.innerHTML = `<b>Install on iPhone / iPad</b><ol><li>Tap ${share} at the bottom of Safari</li><li>Scroll down, tap <b>Add to Home Screen</b></li><li>Tap <b>Add</b></li></ol>`; return;
+    }
+    if (isAndroid) {
+      box.innerHTML = `<b>Install on Android</b><ol>${inAppBrowser ? '<li>Tap ⋮ → <b>Open in Chrome</b></li>' : ''}<li>Tap <span class="kbd">⋮</span> at the top right of Chrome</li><li>Tap <b>Install app</b> or <b>Add to Home screen</b></li></ol>`; return;
+    }
+    box.innerHTML = `<b>Install on computer</b><div>In Chrome or Edge, click the install icon at the right end of the address bar. On a phone, scan the QR code below.</div>`;
+  }
+  function openShare() { renderInstallBox(); $('#appLink').textContent = APP_URL; openSheet('#shareSheet'); }
+
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; showBanner(); if (!$('#shareSheet').hidden) renderInstallBox(); });
+  window.addEventListener('appinstalled', () => { deferredPrompt = null; banner.hidden = true; toast('App installed'); });
+  $('#shareAppBtn').onclick = openShare;
+  $('#ibInstall').onclick = doInstall;
+  $('#ibClose').onclick = () => { banner.hidden = true; LS.set('pv_ib_dismissed', true); };
+  $('#shClose').onclick = () => closeTop();
+  const shareText = 'Pedagadi voter list app – open and tap Install / Add to Home Screen:';
+  $('#shShare').onclick = async () => {
+    if (navigator.share) { try { await navigator.share({ title: 'Pedagadi Voters 2026', text: shareText, url: APP_URL }); } catch { } }
+    else { try { await navigator.clipboard.writeText(APP_URL); toast('Link copied'); } catch { toast(APP_URL); } }
+  };
+  $('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(APP_URL); toast('Link copied'); } catch { toast(APP_URL); } };
+  $('#shWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareText + ' ' + APP_URL), '_blank');
+  showBanner();
+
   drawChips(); render();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
 })();
