@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -43,16 +43,17 @@
     <div class="seg" id="viewSeg">
       <button data-view="list" class="on">Voters</button>
       <button data-view="house">Houses</button>
+      <button data-view="surnames">Surnames</button>
       <button data-view="family">Groups</button>
       <button data-view="marked">Marked</button>
     </div>
-    <button id="filterBtn" class="filter-btn">Filters<span id="filterCount"></span></button>
+    <button id="filterBtn" class="filter-btn" aria-label="Filters"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v6l-4 2v-8z"/></svg><b>Filters</b><span id="filterCount"></span></button>
   </div>
   <div id="photoBar" class="photo-bar" hidden title="Saving photos for offline use"><i></i></div>
 </header>
 
 <main>
-  <div class="summary-row"><div id="summary" class="summary"></div><div id="activeFilters" class="active-filters"></div><button id="selectBtn" class="select-btn">☑ Select</button></div>
+  <div class="summary-row"><div id="summary" class="summary"></div><div id="activeFilters" class="active-filters"></div><button id="selectBtn" class="sel-start">☑ Select</button></div>
   <div id="list" class="list"></div>
   <div id="sentinel"></div>
 </main>
@@ -174,7 +175,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=17"></script>
-<script src="app.js?v=17"></script>
+<script src="data.js?v=18"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

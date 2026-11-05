@@ -277,8 +277,8 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 @media (max-width:374px){.seg button{padding:6px 7px;font-size:12.5px}.filter-btn{padding-left:9px;padding-right:9px}.toolbar{gap:6px}}
 
 /* multi-select */
-.select-btn{margin-left:auto;border:1px solid var(--line);background:var(--card);color:var(--brand);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;font-weight:600}
-.select-btn[hidden]{display:none}
+.sel-start{margin-left:auto;border:1px solid var(--line);background:var(--card);color:var(--brand);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;font-weight:600}
+.sel-start[hidden]{display:none}
 .selecting [data-id]{position:relative;user-select:none;-webkit-user-select:none}
 .selecting .card{padding-left:44px}
 .selecting .member{padding-left:40px}
@@ -299,3 +299,34 @@ body.has-selbar main{padding-bottom:80px}
 .sel-bar .sel-x{margin-right:2px}
 #selAll{margin-left:auto}
 @media (max-width:429px){.sel-n span{display:none}.sel-n{font-size:16px;min-width:22px;text-align:center}}
+
+/* five tabs: the tab bar scrolls sideways if it has to */
+.toolbar .seg{flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.toolbar .seg::-webkit-scrollbar{display:none}
+.seg button{flex:none;white-space:nowrap}
+.filter-btn{flex:none}
+/* Surnames tab */
+.sn-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 10px;font-size:13px;color:var(--muted)}
+.sn-tools .chip{border-color:var(--line);color:var(--ink);background:var(--chip)}
+.sn-tools .chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.sn-tools [data-new]{margin-left:auto;color:var(--brand);font-weight:600}
+.sn-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--card);border:0;border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 12px;margin-bottom:8px;color:var(--ink);font:inherit;position:relative}
+.sn-main{flex:1;min-width:0}
+.sn-te{font-size:16px;font-weight:700}
+.sn-en{font-size:13px;color:var(--muted);margin-top:1px}
+.sn-en span{font-size:12px}
+.sn-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.sn-tag{font-size:12px;font-weight:600;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.sn-n{flex:none;font-weight:800;font-size:15px;color:var(--brand);min-width:28px;text-align:right}
+.selecting [data-sn]{user-select:none;-webkit-user-select:none;padding-left:44px}
+.selecting [data-sn]::before{content:'';position:absolute;left:12px;top:50%;width:20px;height:20px;margin-top:-10px;border-radius:50%;border:2px solid var(--muted);background:var(--card);box-sizing:border-box}
+.selecting [data-sn].picked::before{content:'✓';border-color:var(--brand);background:var(--brand);color:#fff;font-size:13px;font-weight:800;line-height:16px;text-align:center}
+.selecting .sn-row.picked{background:color-mix(in srgb,var(--brand) 10%,var(--card))}
+[data-sn]{-webkit-touch-callout:none}
+.fam-chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+#selMark[hidden]{display:none}
+
+.filter-btn{display:inline-flex;align-items:center;gap:5px}
+.filter-btn b{font-weight:inherit}
+@media (max-width:419px){.filter-btn b{display:none}.filter-btn{padding:6px 8px}.seg button{padding:6px 7px;font-size:12.5px}}
+@media (max-width:339px){.seg button{padding:6px 5px;font-size:12px}}
