@@ -213,3 +213,12 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .sheet-x{position:absolute;top:6px;right:10px;width:34px;height:34px;border-radius:50%;border:0;background:var(--chip);color:var(--ink);display:grid;place-items:center;padding:0;cursor:pointer}
 .sheet h2{padding-right:40px;margin-top:-8px}
 .picker .sheet-top{position:relative;top:0}
+
+.recent{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.rc-row{display:flex;align-items:stretch;border-top:1px solid var(--line)}
+.rc-row:first-child{border-top:0}
+.rc-open{flex:1;min-width:0;text-align:left;background:none;border:0;color:inherit;padding:10px 12px;font:inherit;display:flex;flex-direction:column;gap:2px}
+.rc-open b{font-family:ui-monospace,Menlo,monospace;letter-spacing:.05em;font-size:15px}
+.rc-open small{color:var(--muted);font-size:12px}
+.rc-open:disabled{opacity:.5}
+.rc-x{flex:none;width:44px;background:none;border:0;border-left:1px solid var(--line);color:var(--muted);font-size:22px}

@@ -430,7 +430,7 @@
   const FIREBASE = { apiKey: 'AIzaSyBeWCjXWcZqS9C_hxuLTW_lKljXutuY4gU', projectId: 'voter-list-552ea', host: 'https://firestore.googleapis.com' };
   const cloud = {
     code: LS.get('pv_sync_code', ''), q: LS.get('pv_sync_q', {}), last: LS.get('pv_sync_last', 0),
-    busy: false, err: '', timer: 0,
+    busy: false, err: '', timer: 0, hist: LS.get('pv_sync_hist', []),
     get ready() { return !!(FIREBASE.apiKey && FIREBASE.projectId); },
     url(extra = '') {
       return `${FIREBASE.host}/v1/projects/${FIREBASE.projectId}/databases/(default)/documents/lists/${encodeURIComponent(this.code)}?key=${FIREBASE.apiKey}${extra}`;
@@ -471,23 +471,58 @@
       this.busy = true; drawSyncDot();
       try {
         await this.flush();
-        const d = await this.pull();
-        // the cloud copy wins, except for changes still waiting to be sent
-        const m = new Set(Object.keys(d.m).filter(id => d.m[id].booleanValue)), n = {};
-        Object.keys(d.n).forEach(id => { if (d.n[id].stringValue) n[id] = d.n[id].stringValue; });
-        Object.entries(this.q).forEach(([k, val]) => {
-          const id = k.slice(2);
-          if (k[0] === 'm') val ? m.add(id) : m.delete(id); else if (val) n[id] = val; else delete n[id];
-        });
-        const changed = m.size !== marks.size || [...m].some(id => !marks.has(id));
-        marks.clear(); m.forEach(id => marks.add(id)); LS.set('pv_marks', [...marks]);
-        const editing = document.activeElement && document.activeElement.id === 'dNote';
-        if (!editing) { Object.keys(notes).forEach(k => delete notes[k]); Object.assign(notes, n); LS.set('pv_notes', notes); }
-        if (changed) refreshMarks();
+        this.apply(await this.pull());
         this.last = Date.now(); LS.set('pv_sync_last', this.last); this.err = '';
+        this.remember(this.code);
       } catch (e) { this.err = navigator.onLine ? 'error' : 'offline'; }
       this.busy = false; drawSyncDot();
       if (Object.keys(this.q).length && !this.err) this.sync();
+    },
+    // make this device's marks and notes match the cloud copy (plus changes not yet sent)
+    apply(d) {
+      // the cloud copy wins, except for changes still waiting to be sent
+      const m = new Set(Object.keys(d.m).filter(id => d.m[id].booleanValue)), n = {};
+      Object.keys(d.n).forEach(id => { if (d.n[id].stringValue) n[id] = d.n[id].stringValue; });
+      Object.entries(this.q).forEach(([k, val]) => {
+        const id = k.slice(2);
+        if (k[0] === 'm') val ? m.add(id) : m.delete(id); else if (val) n[id] = val; else delete n[id];
+      });
+      const changed = m.size !== marks.size || [...m].some(id => !marks.has(id));
+      marks.clear(); m.forEach(id => marks.add(id)); LS.set('pv_marks', [...marks]);
+      const editing = document.activeElement && document.activeElement.id === 'dNote';
+      if (!editing) { Object.keys(notes).forEach(k => delete notes[k]); Object.assign(notes, n); LS.set('pv_notes', notes); }
+      if (changed) refreshMarks();
+    },
+    // codes used on this device, newest first
+    remember(c) {
+      if (!c) return;
+      this.hist = [{ code: c, t: Date.now() }].concat(this.hist.filter(h => h.code !== c)).slice(0, 12);
+      LS.set('pv_sync_hist', this.hist);
+    },
+    forget(c) { this.hist = this.hist.filter(h => h.code !== c); LS.set('pv_sync_hist', this.hist); },
+    // open a recent code: this device's marks are replaced by that list's cloud copy (not merged)
+    async switchTo(c) {
+      if (!navigator.onLine) { toast('Connect to the internet to switch codes'); return false; }
+      if (this.busy) return false;
+      this.busy = true; drawSyncDot();
+      const old = this.code;
+      // unsent changes still go to the list they were made in, then they are dropped from this device
+      if (old && Object.keys(this.q).length) { try { await this.flush(); } catch { } }
+      try {
+        this.code = c;
+        const d = await this.pull();
+        this.q = {}; LS.set('pv_sync_q', {}); LS.set('pv_sync_code', c);
+        const dn = $('#dNote'); if (dn) dn.blur();
+        this.apply(d);
+        if (old) this.remember(old);
+        this.remember(c);
+        this.last = Date.now(); LS.set('pv_sync_last', this.last); this.err = '';
+        this.busy = false; drawSyncDot(); render();
+        return true;
+      } catch {
+        this.code = old; this.busy = false; drawSyncDot();
+        toast('Could not load that code. Try again.'); return false;
+      }
     },
     join(code) {
       this.code = code; LS.set('pv_sync_code', code);
@@ -497,7 +532,7 @@
       LS.set('pv_sync_q', this.q);
       return this.sync();
     },
-    leave() { this.code = ''; this.q = {}; this.err = ''; LS.set('pv_sync_code', ''); LS.set('pv_sync_q', {}); drawSyncDot(); }
+    leave() { this.remember(this.code); this.code = ''; this.q = {}; this.err = ''; LS.set('pv_sync_code', ''); LS.set('pv_sync_q', {}); drawSyncDot(); }
   };
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const newCode = () => { const a = crypto.getRandomValues(new Uint8Array(8)); return 'PDG-' + [...a].map((x, i) => (i === 4 ? '-' : '') + CODE_CHARS[x % CODE_CHARS.length]).join(''); };
@@ -535,12 +570,26 @@
     if (!cloud.ready) {
       box.innerHTML = `<p>Sync isn't set up yet. The app owner needs to add the Firebase settings.</p>`; return;
     }
+    const recent = cloud.hist.filter(h => h.code !== cloud.code);
+    const recentHTML = recent.length ? `<h3>Recent codes on this device</h3>
+      <div class="recent">${recent.map(h => `<div class="rc-row"><button class="rc-open" data-code="${esc(h.code)}"><b>${esc(h.code)}</b><small>Last used ${ago(h.t)}</small></button>
+        <button class="rc-x" data-forget="${esc(h.code)}" aria-label="Remove ${esc(h.code)} from this list">×</button></div>`).join('')}</div>
+      <p class="hint">Opening a recent code replaces the marks and notes on this device with that code's saved copy.</p>` : '';
+    const bindRecent = () => box.querySelectorAll('.rc-open').forEach(b => b.onclick = async () => {
+      const c = b.dataset.code;
+      if (!confirm(`Open ${c}?\nMarks and notes on this device will be replaced by the ones saved under ${c}.`)) return;
+      b.disabled = true;
+      if (await cloud.switchTo(c)) toast(`Switched to ${c} · ${marks.size} marked`);
+      drawSync();
+    });
+    box.onclick = e => { const x = e.target.closest('[data-forget]'); if (x) { cloud.forget(x.dataset.forget); drawSync(); } };
     if (!cloud.code) {
       box.innerHTML = `<p class="sync-lead">Marks and notes are saved on this device only. Turn on sync to see the same marks on all your devices.</p>
         <button class="btn primary w100" id="syNew">Create a sync code</button>
         <div class="sync-or">or, if you already have a code</div>
         <div class="sync-join"><input id="syCode" placeholder="PDG-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false"><button class="btn" id="syJoin">Join</button></div>
-        <p class="hint">Anyone who has your code can see and change these marks and notes. Share it only with people you trust.</p>`;
+        <p class="hint">Anyone who has your code can see and change these marks and notes. Share it only with people you trust.</p>${recentHTML}`;
+      bindRecent();
       $('#syNew').onclick = async () => { await cloud.join(newCode()); toast(cloud.err ? 'Saved here, will sync when online' : 'Sync is on'); };
       $('#syJoin').onclick = async () => {
         const c = cleanCode($('#syCode').value);
@@ -561,7 +610,9 @@
         <button class="btn" id="syCopy">Copy code</button>
       </div>
       <p class="hint">Changes sync automatically when you mark someone, open the app, or come back to it. Anyone who has this code can see and change the marks.</p>
+      ${recentHTML}
       <button class="btn ghost w100 danger" id="syOff">Stop syncing on this device</button>`;
+    bindRecent();
     $('#syNow').onclick = () => cloud.sync();
     $('#syCopy').onclick = async () => { try { await navigator.clipboard.writeText(cloud.code); toast('Code copied'); } catch { toast(cloud.code); } };
     $('#syShare').onclick = async () => {
