@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -42,10 +42,10 @@
   <div class="toolbar">
     <div class="seg" id="viewSeg">
       <button data-view="list" class="on">Voters</button>
-      <button data-view="house">Houses</button>
       <button data-view="surnames">Surnames</button>
-      <button data-view="family">Groups</button>
-      <button data-view="marked">Marked</button>
+      <button data-view="family">Families</button>
+      <button data-view="caste">Castes</button>
+      <button id="moreBtn" class="more-btn" aria-haspopup="menu" aria-expanded="false">More<i aria-hidden="true"></i></button>
     </div>
     <button id="filterBtn" class="filter-btn" aria-label="Filters"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3 5h18l-7 8v6l-4 2v-8z"/></svg><b>Filters</b><span id="filterCount"></span></button>
   </div>
@@ -165,6 +165,11 @@
   </div>
 </div>
 
+<div id="moreMenu" class="more-menu" role="menu" hidden>
+  <button data-view="house" role="menuitem"><span>🏠</span>Houses<small>voters grouped by house no.</small></button>
+  <button data-view="marked" role="menuitem"><span>★</span>Marked<b id="mmMarkedN"></b></button>
+</div>
+
 <div id="selBar" class="sel-bar" hidden>
   <button id="selX" class="sel-x" aria-label="Stop selecting">✕</button>
   <span id="selN" class="sel-n">0 selected</span>
@@ -175,7 +180,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=19"></script>
-<script src="app.js?v=19"></script>
+<script src="data.js?v=20"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
