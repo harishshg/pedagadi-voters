@@ -127,13 +127,17 @@
     if (S.view === 'surnames') {
       groups = snRows();
       const castes = Object.keys(FAM).filter(gid => gType(gid) === 'caste').sort((a, b) => famName(a).localeCompare(famName(b)));
-      const all = snRows(true), none = all.filter(r => !r.castes.length).length;
-      $('#summary').textContent = `${groups.length} surname${groups.length === 1 ? '' : 's'}${S.ward ? ' in Ward ' + S.ward : ''} · ${none} not in a caste`;
+      const all = snRows(true), none = all.filter(r => !r.castes.length).length, inCaste = all.length - none;
+      $('#summary').textContent = `${groups.length} surname${groups.length === 1 ? '' : 's'}${S.ward ? ' in Ward ' + S.ward : ''}`;
       const chip = (k, l) => `<button class="chip ${S.snf === k ? 'on' : ''}" data-snf="${k}">${l}</button>`;
-      listEl.innerHTML = `<div class="chips wrap g-types">${chip('all', `All ${all.length}`)}${chip('none', `No caste ${none}`)}${castes.map(gid => chip(gid, `🏷️ ${esc(famName(gid))} ${all.filter(r => r.castes.includes(gid)).length}`)).join('')}</div>
+      const tab = (k, l, n) => `<button class="${S.snf === k || (k === 'any' && FAM[S.snf]) ? 'on' : ''}" data-snf="${k}">${l}<b>${n}</b></button>`;
+      const pct = all.length ? Math.round(inCaste / all.length * 100) : 0;
+      listEl.innerHTML = `<div class="sn-tabs">${tab('none', 'Not assigned', none)}${tab('any', 'Assigned', inCaste)}${tab('all', 'All', all.length)}</div>
+        <div class="sn-progress" title="${pct}% of surnames have a caste"><i style="width:${pct}%"></i></div>
+        ${(S.snf === 'any' || FAM[S.snf]) && castes.length ? `<div class="chips wrap g-types">${chip('any', 'Every caste')}${castes.map(gid => chip(gid, `🏷️ ${esc(famName(gid))} ${all.filter(r => r.castes.includes(gid)).length}`)).join('')}</div>` : ''}
         <div class="sn-tools"><span>Sort:</span>${[['count', 'Most voters'], ['az', 'A–Z']].map(([k, l]) => `<button class="chip ${S.snsort === k ? 'on' : ''}" data-snsort="${k}">${l}</button>`).join('')}
         <button class="chip" data-new="caste">＋ New caste</button></div>` +
-        (groups.length ? '' : '<div class="empty">No surname matches.</div>');
+        (groups.length ? '' : `<div class="empty">${S.snf === 'none' && !S.q.trim() ? '🎉 Every surname has a caste.' : S.snf === 'any' && !S.q.trim() ? 'No surname has a caste yet.<br>Open “Not assigned”, select surnames and tap “Set caste”.' : 'No surname matches.'}</div>`);
       more(); return;
     }
     if (S.view === 'family') {
@@ -576,6 +580,7 @@
     if (ignoreFilter) return rows;
     if (raw) rows = rows.filter(r => te ? teNorm(r.te).includes(teNorm(raw)) : phon(r.en).includes(p));
     if (S.snf === 'none') rows = rows.filter(r => !r.castes.length);
+    else if (S.snf === 'any') rows = rows.filter(r => r.castes.length);
     else if (S.snf !== 'all') { if (FAM[S.snf]) rows = rows.filter(r => r.castes.includes(S.snf)); else S.snf = 'all'; }
     rows.sort(S.snsort === 'az' ? (a, b) => a.en.localeCompare(b.en) : (a, b) => b.n - a.n || a.en.localeCompare(b.en));
     return rows;

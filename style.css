@@ -330,3 +330,10 @@ body.has-selbar main{padding-bottom:80px}
 .filter-btn b{font-weight:inherit}
 @media (max-width:419px){.filter-btn b{display:none}.filter-btn{padding:6px 8px}.seg button{padding:6px 7px;font-size:12.5px}}
 @media (max-width:339px){.seg button{padding:6px 5px;font-size:12px}}
+
+.sn-tabs{display:flex;background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;margin-bottom:8px}
+.sn-tabs button{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);border-radius:9px;padding:8px 4px;font:inherit;font-size:13.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:1px;white-space:nowrap}
+.sn-tabs button b{font-size:16px;font-weight:800}
+.sn-tabs button.on{background:var(--brand);color:#fff;box-shadow:var(--shadow)}
+.sn-progress{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin:0 2px 10px}
+.sn-progress i{display:block;height:100%;background:#22c55e}
