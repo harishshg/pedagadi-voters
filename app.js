@@ -46,6 +46,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const casteCls = c => c === 'Not specified' ? 'NS' : c;
   const casteLbl = c => c === 'Not specified' ? '—' : c;
+  const wardPill = v => `<span class="wpill">Ward ${v.ward}</span>`;
   const natural = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
   const photo = (v, cls = '') => v.photo
     ? `<img src="photos/${esc(v.photo)}" alt="" loading="lazy" decoding="async" class="${cls}">`
@@ -96,10 +97,10 @@
     return `<button class="card" data-id="${v.id}">
       ${photo(v)}
       <div class="body">
-        <div class="nm">${hl(v.name || '(name not in list)', S.q)}</div>
+        <div class="nm-row"><div class="nm">${hl(v.name || '(name not in list)', S.q)}</div>${wardPill(v)}</div>
         <div class="en">${esc(v.name_en)}</div>
         <div class="rel">${esc(v.relation)}: ${hl(v.relation_name || '—', S.q)}</div>
-        <div class="meta"><span>Ward <b>${v.ward}</b></span><span>House <b>${esc(v.house_no || '—')}</b></span>
+        <div class="meta"><span>House <b>${esc(v.house_no || '—')}</b></span>
           <span class="tag ${casteCls(v.caste)}">${casteLbl(v.caste)}</span></div>
       </div>
       <span class="sn">#${v.serial}</span>
@@ -110,7 +111,7 @@
   function houseHTML(g) {
     const [w, h] = g.key.split('|');
     return `<div class="house"><div class="house-h"><span>Ward ${w} · House ${esc(h)}</span><small>${g.items.length} voter${g.items.length > 1 ? 's' : ''}</small></div>
-      ${g.items.map(v => `<button class="member" data-id="${v.id}">${photo(v)}<div><div class="nm">${hl(v.name || '—', S.q)} ${marks.has(v.id) ? '<span class="tag" style="background:var(--mark)">★</span>' : ''}</div>
+      ${g.items.map(v => `<button class="member" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag" style="background:var(--mark)">★</span>' : ''}</div>
       <div class="en">${esc(v.name_en)} · ${esc(v.relation)}: ${esc(v.relation_name_en || '—')} · #${v.serial}</div></div></button>`).join('')}</div>`;
   }
 
@@ -254,7 +255,7 @@
   // ---------- detail ----------
   function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => el.hidden = true, 1800); }
   function textOf(v) {
-    return `${v.name} (${v.name_en})\n${v.relation}: ${v.relation_name} (${v.relation_name_en})\nWard ${v.ward} · Serial ${v.serial} · House ${v.house_no || '—'}\nEPIC: ${v.epic}\nAC list: 31-${v.ac_part}-${v.ac_serial}`;
+    return `${v.name} (${v.name_en}) – Ward ${v.ward}\n${v.relation}: ${v.relation_name} (${v.relation_name_en})\nWard ${v.ward} · Serial ${v.serial} · House ${v.house_no || '—'}\nEPIC: ${v.epic}\nAC list: 31-${v.ac_part}-${v.ac_serial}`;
   }
   function showDetail(id, replace) {
     const v = byId.get(id); if (!v) return;
@@ -263,7 +264,7 @@
     $('#detail').innerHTML = `
       <div class="d-top">${photo(v)}
         <div><div class="nm">${esc(v.name || '(name not in list)')}</div><div class="en">${esc(v.name_en)}</div>
-        <div style="margin-top:6px"><span class="tag ${casteCls(v.caste)}">${casteLbl(v.caste)}</span></div></div></div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${wardPill(v)}<span class="tag ${casteCls(v.caste)}">${casteLbl(v.caste)}</span></div></div></div>
       <dl class="fields">
         <dt>${esc(v.relation)}</dt><dd>${esc(v.relation_name || '—')}<small>${esc(v.relation_name_en)}</small></dd>
         <dt>Ward</dt><dd>${v.ward}</dd>
@@ -282,7 +283,7 @@
       </div>
       <textarea class="note" id="dNote" placeholder="Private note (saved on this phone only)">${esc(notes[v.id] || '')}</textarea>
       ${fam.length ? `<h3 style="font-size:13px;color:var(--muted);margin:16px 0 4px;text-transform:uppercase">Same house (${fam.length})</h3>
-        <div class="house">${fam.map(x => `<button class="member" data-fam="${x.id}">${photo(x)}<div><div class="nm">${esc(x.name || '—')}</div>
+        <div class="house">${fam.map(x => `<button class="member" data-fam="${x.id}">${photo(x)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(x.name || '—')}</div>${wardPill(x)}</div>
         <div class="en">${esc(x.name_en)} · ${esc(x.relation)}: ${esc(x.relation_name_en || '—')} · #${x.serial}</div></div></button>`).join('')}</div>` : ''}
       <div class="sheet-actions"><button class="btn primary" id="dClose">Close</button></div>`;
     $('#dClose').onclick = () => closeTop();

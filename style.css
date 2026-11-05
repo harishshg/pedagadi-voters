@@ -180,3 +180,12 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .af b{font-size:15px;line-height:1;color:var(--muted);font-weight:400}
 .linkish{border:0;background:none;color:var(--brand);font-weight:600;padding:0;text-decoration:underline;font-size:13px}
 @media (prefers-color-scheme:dark){.linkish{color:#8cc4f5}}
+
+/* ward label shown next to every name */
+.nm-row{display:flex;align-items:center;gap:6px;min-width:0;padding-right:34px}
+.nm-row .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.member .nm-row{padding-right:0}
+.m-body{flex:1;min-width:0}
+.wpill{flex:none;display:inline-block;font-size:11.5px;font-weight:700;line-height:1.5;padding:0 7px;border-radius:999px;background:var(--accent);color:var(--brand);border:1px solid var(--brand);white-space:nowrap}
+@media (prefers-color-scheme:dark){.wpill{color:#cfe3f7;border-color:#4a7fb3}}
+.d-top .wpill{font-size:12.5px;padding:1px 9px}
