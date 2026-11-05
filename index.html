@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -52,7 +52,7 @@
 </header>
 
 <main>
-  <div class="summary-row"><div id="summary" class="summary"></div><div id="activeFilters" class="active-filters"></div></div>
+  <div class="summary-row"><div id="summary" class="summary"></div><div id="activeFilters" class="active-filters"></div><button id="selectBtn" class="select-btn">☑ Select</button></div>
   <div id="list" class="list"></div>
   <div id="sentinel"></div>
 </main>
@@ -164,9 +164,17 @@
   </div>
 </div>
 
+<div id="selBar" class="sel-bar" hidden>
+  <button id="selX" class="sel-x" aria-label="Stop selecting">✕</button>
+  <span id="selN" class="sel-n">0 selected</span>
+  <button id="selAll" class="sel-b">All</button>
+  <button id="selMark" class="sel-b">★ Mark</button>
+  <button id="selGroup" class="sel-b primary">＋ Group</button>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=16"></script>
-<script src="app.js?v=16"></script>
+<script src="data.js?v=17"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

@@ -158,6 +158,7 @@
     const chunk = src.slice(shown, shown + (isHouse || isFam ? 15 : PAGE));
     listEl.insertAdjacentHTML('beforeend', chunk.map(isFam ? famHTML : isHouse ? houseHTML : cardHTML).join(''));
     shown += chunk.length;
+    paintSel();
   }
   new IntersectionObserver(es => { if (es[0].isIntersecting) more(); }, { rootMargin: '600px' }).observe($('#sentinel'));
 
@@ -192,7 +193,7 @@
     const b = e.target.closest('[data-clear]'); if (!b) return;
     const k = b.dataset.clear; S[k] = k === 'surname' || k === 'group' ? '' : 'all'; update();
   };
-  function update() { saveState(); drawChips(); render(); window.scrollTo({ top: 0 }); }
+  function update() { saveState(); drawChips(); render(); window.scrollTo({ top: 0 }); if (selecting) drawSelBar(); }
   document.querySelectorAll('#viewSeg button').forEach(b => b.onclick = () => { S.view = b.dataset.view; update(); });
 
   // ---------- search input ----------
@@ -226,7 +227,7 @@
     for (let i = 0; i < n; i++) hideTop();
     ownPops++; history.go(-n);
   }
-  window.addEventListener('popstate', () => { if (ownPops) { ownPops--; return; } hideTop(); });
+  window.addEventListener('popstate', () => { if (ownPops) { ownPops--; return; } if (open.length) hideTop(); else if (selecting) exitSelect(); });
   document.querySelectorAll('.sheet-backdrop').forEach(bd => bd.addEventListener('click', e => { if (e.target === bd) closeTop(); }));
   // close (×) button in the top corner + swipe down to close, for every sheet
   document.querySelectorAll('.sheet').forEach(sh => {
@@ -388,8 +389,99 @@
     const gt = e.target.closest('[data-gt]'); if (gt) { S.gtype = gt.dataset.gt; saveState(); render(); return; }
     const gl = e.target.closest('[data-fam-list]'); if (gl) { showGroupInList(gl.dataset.famList); return; }
     const f = e.target.closest('[data-fam-open]'); if (f) { showFam(f.dataset.famOpen); return; }
-    const b = e.target.closest('[data-id]'); if (b) showDetail(b.dataset.id);
+    const b = e.target.closest('[data-id]'); if (!b) return;
+    if (pressed) { pressed = false; return; }  // the click that ends a long-press
+    if (selecting) toggleSel(b.dataset.id); else showDetail(b.dataset.id);
   });
+
+  // ---------- multi-select: tap "Select" or long-press a voter, then act on all of them ----------
+  const sel = new Set(); let selecting = false, pressed = false, pressT = 0, pressXY = null;
+  function paintSel() {
+    listEl.classList.toggle('selecting', selecting);
+    if (!selecting) { listEl.querySelectorAll('.picked').forEach(el => el.classList.remove('picked')); return; }
+    listEl.querySelectorAll('[data-id]').forEach(el => el.classList.toggle('picked', sel.has(el.dataset.id)));
+  }
+  function drawSelBar() {
+    const bar = $('#selBar'); bar.hidden = !selecting;
+    document.body.classList.toggle('has-selbar', selecting);
+    $('#selN').innerHTML = `${sel.size}<span> selected</span>`;
+    $('#selMark').disabled = $('#selGroup').disabled = !sel.size;
+    const all = visibleIds();
+    $('#selAll').textContent = all.length && all.every(id => sel.has(id)) ? 'Clear' : `All ${all.length.toLocaleString()}`;
+    $('#selectBtn').hidden = selecting;
+  }
+  // the voters on screen right now (after search and filters)
+  function visibleIds() {
+    if (S.view === 'family') return [...new Set(groups.flatMap(g => g.items.map(v => v.id)))];
+    return current.map(v => v.id);
+  }
+  function enterSelect(first) {
+    if (!selecting) { selecting = true; history.pushState({ select: 1 }, ''); }
+    if (first) sel.add(first);
+    paintSel(); drawSelBar();
+  }
+  function exitSelect() { selecting = false; sel.clear(); paintSel(); drawSelBar(); }
+  // leave select mode from a button: go back over its history entry (and any sheets on top)
+  function leaveSelect() { const n = open.length; for (let i = 0; i < n; i++) hideTop(); exitSelect(); ownPops++; history.go(-(n + 1)); }
+  function toggleSel(id) {
+    sel.has(id) ? sel.delete(id) : sel.add(id);
+    listEl.querySelectorAll(`[data-id="${id}"]`).forEach(el => el.classList.toggle('picked', sel.has(id)));
+    drawSelBar();
+  }
+  listEl.addEventListener('pointerdown', e => {
+    const b = e.target.closest('[data-id]'); if (!b || selecting) return;
+    pressXY = [e.clientX, e.clientY];
+    pressT = setTimeout(() => { pressed = true; if (navigator.vibrate) navigator.vibrate(15); enterSelect(b.dataset.id); }, 500);
+  });
+  const cancelPress = e => { if (pressT && (!e || !pressXY || e.type !== 'pointermove' || Math.hypot(e.clientX - pressXY[0], e.clientY - pressXY[1]) > 10)) { clearTimeout(pressT); pressT = 0; } };
+  ['pointerup', 'pointercancel', 'pointermove'].forEach(t => listEl.addEventListener(t, cancelPress));
+  listEl.addEventListener('contextmenu', e => { if (e.target.closest('[data-id]')) e.preventDefault(); });
+  $('#selectBtn').onclick = () => enterSelect();
+  $('#selX').onclick = () => leaveSelect();
+  $('#selAll').onclick = () => {
+    const all = visibleIds();
+    if (all.length && all.every(id => sel.has(id))) sel.clear(); else all.forEach(id => sel.add(id));
+    paintSel(); drawSelBar();
+  };
+  $('#selMark').onclick = () => {
+    const ids = [...sel], on = !ids.every(id => marks.has(id));
+    ids.forEach(id => { if (on) marks.add(id); else marks.delete(id); cloud.put('m', id, on || null); });
+    LS.set('pv_marks', [...marks]); refreshMarks(); paintSel();
+    toast(`${on ? 'Marked' : 'Unmarked'} ${ids.length}`);
+  };
+  $('#selGroup').onclick = () => showBulkPick();
+  // add the selected voters to a group
+  function showBulkPick(again) {
+    const ids = [...sel], n = ids.length;
+    const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
+    $('#famPick').innerHTML = `<h2>Add ${n} voter${n === 1 ? '' : 's'} to a group</h2>
+      <div class="d-actions"><button class="btn primary" id="bpNewF">＋ New family</button><button class="btn primary" id="bpNewC">＋ New caste</button></div>
+      ${list.length ? `<h3>Your groups</h3><div class="picker-list fp-list">${list.map(gid => {
+        const inN = ids.filter(id => inGroup(gid, id)).length, all = inN === n;
+        return `<button class="opt ${all ? 'sel' : ''}" data-bg="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}${esc(gLabel(gid))}</div>
+          <div class="o-en">${GT[gType(gid)].label} · ${inN ? `${inN} of ${n} already in` : `${gMembers(gid).size} voters`}</div></div><span class="o-n">${all ? 'Remove' : `Add ${n - inN}`}</span></button>`;
+      }).join('')}</div>` : '<p class="hint">No groups yet. Make one above.</p>'}
+      <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
+    const box = $('#famPick');
+    box.querySelector('#fpClose').onclick = () => closeTop();
+    box.querySelector('#bpNewF').onclick = () => bulkNew('family');
+    box.querySelector('#bpNewC').onclick = () => bulkNew('caste');
+    box.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => {
+      const gid = b.dataset.bg, all = ids.every(id => inGroup(gid, id));
+      if (all) { if (!confirm(`Remove these ${n} from ${famName(gid)}?`)) return; gRemoveMany(gid, ids); toast(`Removed ${n} from ${famName(gid)}`); showBulkPick(true); return; }
+      const added = gAddMany(gid, ids);
+      toast(`Added ${added} to ${famName(gid)}`); leaveSelect();
+    });
+    if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
+  }
+  function bulkNew(t) {
+    const ids = [...sel];
+    const name = prompt(`Name of the new ${GT[t].label.toLowerCase()} group for these ${ids.length} voters (e.g. ${GT[t].eg}):`, '');
+    if (!name || !name.trim()) return;
+    const gid = famNew(name.trim().slice(0, 40), t);
+    gAddMany(gid, ids);
+    toast(`Made ${famName(gid)} with ${ids.length} voters`); leaveSelect();
+  }
 
   // ---------- groups: families and castes ----------
   // A group = voters added one by one (v) + everyone with one of its surnames (s) − voters taken out (x).
@@ -415,6 +507,16 @@
     const g = FAM[gid]; if (!g) return;
     if (on) g[field][key] = true; else delete g[field][key];
     cloud.put(field.toUpperCase(), gid + '|' + key, on || null);
+  }
+  // many at once: one redraw at the end
+  function gAddMany(gid, ids) {
+    let n = 0;
+    ids.forEach(vid => { if (inGroup(gid, vid)) return; n++; gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); });
+    famChanged(); return n;
+  }
+  function gRemoveMany(gid, ids) {
+    ids.forEach(vid => { const v = byId.get(vid); gSet(gid, 'v', vid, false); if (v && v.surname && FAM[gid].s[v.surname]) gSet(gid, 'x', vid, true); });
+    famChanged();
   }
   function gAddVoter(gid, vid) { gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); famChanged(); }
   function gRemoveVoter(gid, vid) {
