@@ -35,8 +35,12 @@
   const marks = new Set(LS.get('pv_marks', []));
   const notes = LS.get('pv_notes', {});
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list' }, saved, { q: '' });
-  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '' }, saved, { q: '' });
+  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname });
+  // surname index: standard spelling -> { te, en, n }
+  const SURNAMES = new Map();
+  V.forEach(v => { if (!v.surname) return; const s = SURNAMES.get(v.surname) || { te: v.surname, en: v.surname_en, n: 0 }; s.n++; SURNAMES.set(v.surname, s); });
+  if (S.surname && !SURNAMES.has(S.surname)) S.surname = '';
 
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -55,6 +59,7 @@
     if (S.ward) list = list.filter(v => v.ward === S.ward);
     if (S.caste !== 'all') list = list.filter(v => v.caste === S.caste);
     if (S.rel !== 'all') list = list.filter(v => v.relation === S.rel);
+    if (S.surname) list = list.filter(v => v.surname === S.surname);
     if (raw) {
       const toks = raw.split(/\s+/).filter(Boolean);
       list = list.filter(v => toks.every(t => {
@@ -68,6 +73,7 @@
     }
     const s = [...list];
     if (S.sort === 'name') s.sort((a, b) => a.name_en.localeCompare(b.name_en));
+    else if (S.sort === 'surname') s.sort((a, b) => (a.surname_en || '~').localeCompare(b.surname_en || '~') || a.name_en.localeCompare(b.name_en));
     else if (S.sort === 'house') s.sort((a, b) => a.ward - b.ward || natural(a.house_no, b.house_no) || a.serial - b.serial);
     else s.sort((a, b) => a.serial - b.serial);
     return s;
@@ -150,11 +156,26 @@
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
     chips($('#relChips'), [['all', 'All'], ['Father', 'Father (తండ్రి)'], ['Husband', 'Husband (భర్త)'], ['Mother', 'Mother (తల్లి)'], ['Not stated', 'Not stated']], S.rel, v => { S.rel = v; update(); });
-    chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
+    chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
     document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.view === S.view));
-    const fc = (S.caste !== 'all') + (S.rel !== 'all');
+    const fc = (S.caste !== 'all') + (S.rel !== 'all') + !!S.surname;
     $('#filterCount').textContent = fc ? fc : '';
+    // surname dropdown + active filter chips
+    const sn = S.surname && SURNAMES.get(S.surname);
+    const sb = $('#surnameSelect');
+    sb.innerHTML = `<span>${sn ? `${esc(sn.te)} · ${esc(sn.en)} (${sn.n})` : 'All surnames'}</span>`;
+    sb.classList.toggle('on', !!sn);
+    $('#surnameClear').hidden = !sn;
+    const af = [];
+    if (sn) af.push(`<button class="af" data-clear="surname">${esc(sn.te)} · ${esc(sn.en)} <b>×</b></button>`);
+    if (S.caste !== 'all') af.push(`<button class="af" data-clear="caste">${esc(S.caste)} <b>×</b></button>`);
+    if (S.rel !== 'all') af.push(`<button class="af" data-clear="rel">${esc(S.rel)} <b>×</b></button>`);
+    $('#activeFilters').innerHTML = af.join('');
   }
+  $('#activeFilters').onclick = e => {
+    const b = e.target.closest('[data-clear]'); if (!b) return;
+    const k = b.dataset.clear; S[k] = k === 'surname' ? '' : 'all'; update();
+  };
   function update() { saveState(); drawChips(); render(); window.scrollTo({ top: 0 }); }
   document.querySelectorAll('#viewSeg button').forEach(b => b.onclick = () => { S.view = b.dataset.view; update(); });
 
@@ -174,17 +195,61 @@
     history.pushState({ sheet: id }, '');
     document.body.style.overflow = 'hidden';
   }
-  function closeTop(fromPop) {
+  // each open sheet owns one history entry, so the phone's Back button closes the top sheet
+  let ownPops = 0;
+  function hideTop() {
     const el = open.pop(); if (!el) return;
     el.hidden = true;
     if (!open.length) document.body.style.overflow = '';
-    if (!fromPop) history.back();
   }
-  window.addEventListener('popstate', () => { if (open.length) closeTop(true); });
+  function closeTop(n = 1) {
+    n = Math.min(n, open.length); if (!n) return;
+    for (let i = 0; i < n; i++) hideTop();
+    ownPops++; history.go(-n);
+  }
+  window.addEventListener('popstate', () => { if (ownPops) { ownPops--; return; } hideTop(); });
   document.querySelectorAll('.sheet-backdrop').forEach(bd => bd.addEventListener('click', e => { if (e.target === bd) closeTop(); }));
   $('#filterBtn').onclick = () => openSheet('#filterSheet');
   $('#closeFilters').onclick = () => closeTop();
-  $('#resetFilters').onclick = () => { S.caste = 'all'; S.rel = 'all'; S.sort = 'serial'; update(); };
+  $('#resetFilters').onclick = () => { S.caste = 'all'; S.rel = 'all'; S.sort = 'serial'; S.surname = ''; update(); };
+
+  // ---------- surname picker (searchable dropdown) ----------
+  let pickSort = 'count';
+  function drawSurnameList() {
+    const raw = $('#surnameQ').value.trim();
+    const counts = new Map();
+    // counts follow the ward chosen on the main screen
+    V.forEach(v => { if (v.surname && (!S.ward || v.ward === S.ward)) counts.set(v.surname, (counts.get(v.surname) || 0) + 1); });
+    let items = [...counts.entries()].map(([k, n]) => ({ k, n, te: SURNAMES.get(k).te, en: SURNAMES.get(k).en }));
+    if (raw) {
+      const te = isTelugu(raw), p = phon(raw);
+      items = items.filter(s => te ? teNorm(s.te).includes(teNorm(raw)) : phon(s.en).includes(p));
+    }
+    items.sort(pickSort === 'az' ? (a, b) => a.en.localeCompare(b.en) : (a, b) => b.n - a.n || a.en.localeCompare(b.en));
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    const all = raw ? '' : `<button class="opt ${!S.surname ? 'sel' : ''}" data-s=""><div class="o-main"><div class="o-te">All surnames</div><div class="o-en">${counts.size} surnames${S.ward ? ' in Ward ' + S.ward : ''}</div></div><span class="o-n">${total}</span></button>`;
+    $('#surnameList').innerHTML = all + (items.length ? items.map(s =>
+      `<button class="opt ${s.k === S.surname ? 'sel' : ''}" data-s="${esc(s.k)}" role="option"><div class="o-main"><div class="o-te">${esc(s.te)}</div><div class="o-en">${esc(s.en)}</div></div><span class="o-n">${s.n}</span></button>`).join('')
+      : '<div class="empty">No surname matches.</div>');
+  }
+  function openSurnamePicker() {
+    $('#surnameQ').value = '';
+    const drawSort = () => chips($('#surnameSort'), [['count', 'Most voters'], ['az', 'A–Z']], pickSort, v => { pickSort = v; drawSort(); drawSurnameList(); });
+    drawSort();
+    drawSurnameList();
+    openSheet('#surnameSheet');
+    $('#surnameList').scrollTop = 0;
+  }
+  $('#surnameSelect').onclick = openSurnamePicker;
+  $('#surnameClear').onclick = () => { S.surname = ''; update(); };
+  $('#surnameQ').addEventListener('input', drawSurnameList);
+  $('#surnameList').onclick = e => {
+    const b = e.target.closest('[data-s]'); if (!b) return;
+    S.surname = b.dataset.s;
+    // close the picker (and the filters sheet under it) and show the results
+    closeTop(open.length);
+    update();
+  };
 
   // ---------- detail ----------
   function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => el.hidden = true, 1800); }
@@ -203,6 +268,7 @@
         <dt>${esc(v.relation)}</dt><dd>${esc(v.relation_name || '—')}<small>${esc(v.relation_name_en)}</small></dd>
         <dt>Ward</dt><dd>${v.ward}</dd>
         <dt>Serial no.</dt><dd>${v.serial}</dd>
+        <dt>Surname</dt><dd>${v.surname ? `${esc(v.surname)} · ${esc(v.surname_en)}<small><button class="linkish" id="dSurname">See all ${SURNAMES.get(v.surname).n} ${esc(v.surname_en)} voters</button></small>` : '—'}</dd>
         <dt>House no.</dt><dd>${esc(v.house_no || '—')}</dd>
         <dt>EPIC no.</dt><dd>${esc(v.epic)}</dd>
         <dt>Caste</dt><dd>${esc(v.caste)}</dd>
@@ -232,6 +298,11 @@
     };
     $('#dNote').oninput = e => { const val = e.target.value.trim(); if (val) notes[v.id] = val; else delete notes[v.id]; LS.set('pv_notes', notes); };
     $('#detail').querySelectorAll('[data-fam]').forEach(b => b.onclick = () => { showDetail(b.dataset.fam, true); $('#detailSheet .sheet').scrollTop = 0; });
+    if ($('#dSurname')) $('#dSurname').onclick = () => {
+      S.surname = v.surname; S.ward = 0; if (S.view === 'marked') S.view = 'list';
+      q.value = ''; S.q = ''; $('#clearQ').hidden = true;
+      closeTop(open.length); update();
+    };
     if (!replace) openSheet('#detailSheet');
   }
   listEl.addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) showDetail(b.dataset.id); });

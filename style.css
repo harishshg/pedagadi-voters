@@ -149,3 +149,34 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .photo-bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.15)}
 .photo-bar[hidden]{display:none}
 .photo-bar i{display:block;height:100%;width:0;background:#7fd1ff;transition:width .3s}
+
+/* surname dropdown */
+.select-row{display:flex;gap:8px;align-items:center}
+.select-btn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:12px 14px;font-size:15px}
+.select-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.select-btn::after{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-3px)}
+.select-btn.on{border-color:var(--brand);background:var(--accent);font-weight:600}
+.select-x{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:22px;color:var(--muted)}
+.picker{display:flex;flex-direction:column;padding-bottom:0;height:88vh}
+.picker-head{flex:none}
+.picker-head h2{margin-bottom:8px}
+.picker-search{margin:0;border:1px solid var(--line);background:var(--bg)}
+.picker-search input{color:var(--ink)}
+.picker-head .chips{padding:8px 0}
+.picker-list{flex:1;overflow:auto;margin:0 -16px;padding:0 0 calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.opt{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;padding:11px 16px;text-align:left}
+.opt .o-main{flex:1;min-width:0}
+.opt .o-te{font-weight:600;font-size:15.5px}
+.opt .o-en{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.opt .o-n{flex:none;font-size:13px;font-weight:700;color:var(--brand);background:var(--accent);border-radius:999px;padding:2px 9px;font-variant-numeric:tabular-nums}
+.opt.sel{background:var(--accent)}
+.opt.sel .o-te::after{content:" ✓";color:var(--brand)}
+@media (prefers-color-scheme:dark){.opt .o-n{color:#cfe3f7}}
+/* active filter chips next to the count */
+.summary-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;padding:2px 4px 8px}
+.summary-row .summary{padding:0}
+.active-filters{display:flex;flex-wrap:wrap;gap:6px}
+.af{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--brand);background:var(--accent);color:var(--ink);border-radius:999px;padding:3px 6px 3px 10px;font-size:12.5px;font-weight:600}
+.af b{font-size:15px;line-height:1;color:var(--muted);font-weight:400}
+.linkish{border:0;background:none;color:var(--brand);font-weight:600;padding:0;text-decoration:underline;font-size:13px}
+@media (prefers-color-scheme:dark){.linkish{color:#8cc4f5}}
