@@ -261,7 +261,8 @@
       <h3>By ward (tap a row to open)</h3>
       <table class="st"><thead><tr><th>Ward</th><th>Voters</th><th>Houses</th><th>BC</th><th>SC</th><th>ST</th><th>—</th></tr></thead>
       <tbody>${rows}<tr class="tot"><td>Total</td><td>${V.length}</td><td>${households.size}</td><td>${c.BC || 0}</td><td>${c.SC || 0}</td><td>${c.ST || 0}</td><td>${c['Not specified'] || 0}</td></tr></tbody></table>
-      <p style="font-size:12px;color:var(--muted);margin-top:14px">Source: SEC Andhra Pradesh Gram Panchayat electoral roll 2026, published 15-04-2026, age reference date 01-01-2026. Marks and notes are stored only on this device.</p>
+      <p class="photo-status" style="font-size:13px;margin-top:14px">${photoStatusText()}</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px">Source: SEC Andhra Pradesh Gram Panchayat electoral roll 2026, published 15-04-2026, age reference date 01-01-2026. Marks and notes are stored only on this device.</p>
       <div class="sheet-actions"><button class="btn primary" id="sClose">Close</button></div>`;
     $('#sClose').onclick = () => closeTop();
     $('#stats').querySelectorAll('tr[data-ward]').forEach(tr => tr.onclick = () => { S.ward = +tr.dataset.ward; S.view = 'list'; closeTop(); update(); });
@@ -305,7 +306,7 @@
     }
     box.innerHTML = `<b>Install on computer</b><div>In Chrome or Edge, click the install icon at the right end of the address bar. On a phone, scan the QR code below.</div>`;
   }
-  function openShare() { renderInstallBox(); $('#appLink').textContent = APP_URL; openSheet('#shareSheet'); }
+  function openShare() { renderInstallBox(); $('#appLink').textContent = APP_URL; updatePhotoUI(); openSheet('#shareSheet'); }
 
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; if (!$('#shareSheet').hidden) renderInstallBox(); });
   window.addEventListener('appinstalled', () => { deferredPrompt = null; toast('App installed'); });
@@ -318,6 +319,54 @@
   };
   $('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(APP_URL); toast('Link copied'); } catch { toast(APP_URL); } };
   $('#shWa').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(shareText + ' ' + APP_URL), '_blank');
+  // ---------- download all photos in the background (for fast scrolling + offline) ----------
+  const PHOTO_CACHE = 'pv-photos';
+  const photoState = { done: 0, total: V.filter(v => v.photo).length, running: false, finished: false };
+  const pbar = $('#photoBar');
+  function photoStatusText() {
+    if (!('caches' in window)) return 'Offline photos not supported in this browser.';
+    if (photoState.finished) return `✓ All ${photoState.total.toLocaleString()} photos saved for offline use.`;
+    return `Saving photos for offline use: ${photoState.done.toLocaleString()} / ${photoState.total.toLocaleString()}`;
+  }
+  function updatePhotoUI() {
+    const pct = photoState.total ? photoState.done / photoState.total * 100 : 0;
+    pbar.hidden = !photoState.running;
+    pbar.firstElementChild.style.width = pct + '%';
+    document.querySelectorAll('.photo-status').forEach(el => el.textContent = photoStatusText());
+  }
+  async function cacheAllPhotos() {
+    if (!('caches' in window) || photoState.running || !location.protocol.startsWith('http')) return;
+    photoState.running = true;
+    try {
+      const cache = await caches.open(PHOTO_CACHE);
+      const have = new Set((await cache.keys()).map(r => new URL(r.url).pathname));
+      const todo = [];
+      V.forEach(v => {
+        if (!v.photo) return;
+        const u = new URL('photos/' + v.photo, location.href);
+        if (have.has(u.pathname)) photoState.done++; else todo.push(u.href);
+      });
+      updatePhotoUI();
+      let i = 0, fails = 0;
+      const worker = async () => {
+        while (i < todo.length) {
+          const url = todo[i++];
+          try { const r = await fetch(url); if (r.ok) { await cache.put(url, r); photoState.done++; } else fails++; }
+          catch { fails++; }
+          if (photoState.done % 25 === 0) updatePhotoUI();
+        }
+      };
+      await Promise.all(Array.from({ length: 6 }, worker));
+      photoState.finished = photoState.done >= photoState.total;
+      if (todo.length && photoState.finished) toast('All photos saved for offline use');
+    } catch { }
+    photoState.running = false;
+    updatePhotoUI();
+  }
+  // start shortly after the list has rendered; retry when the connection comes back
+  window.addEventListener('load', () => setTimeout(cacheAllPhotos, 1500));
+  window.addEventListener('online', () => { if (!photoState.finished) cacheAllPhotos(); });
+
   drawChips(); render();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
 })();

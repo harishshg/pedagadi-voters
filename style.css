@@ -144,3 +144,8 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .title-row > div:first-child{min-width:0}
 .title-row h1,.title-row .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hdr-btns{flex:none}
+
+/* thin progress line under the header while photos download */
+.photo-bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.15)}
+.photo-bar[hidden]{display:none}
+.photo-bar i{display:block;height:100%;width:0;background:#7fd1ff;transition:width .3s}
