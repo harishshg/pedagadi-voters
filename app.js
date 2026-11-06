@@ -669,21 +669,23 @@
   }
   // ---------- naming a family or caste (an in-app sheet instead of the browser's prompt box) ----------
   // resolves with the name, or null if the sheet was closed; waits for the sheet's history entry to go first
-  function askName({ title, sub = '', label = 'Name', value = '', ok = 'Create', t = 'family', except = '', sugg = [], hint = '' }) {
+  // t = 'family' / 'caste' checks for names already used; t = null for other names (device, sync list)
+  function askName({ title, sub = '', label = 'Name', value = '', ok = 'Create', cancel = 'Cancel', t = 'family', except = '', sugg = [], hint = '', placeholder = '', optional = false, max = 40 }) {
     return new Promise(resolve => {
       const sh = $('#nameSheet'), inp = $('#nmInput');
       $('#nmTitle').textContent = title; $('#nmSub').innerHTML = sub; $('#nmSub').hidden = !sub;
       $('#nmLabel').textContent = label; $('#nmOk').textContent = ok;
-      inp.value = value; inp.placeholder = `e.g. ${GT[t].eg}`;
-      const taken = new Map(Object.keys(FAM).filter(gid => gid !== except && gType(gid) === t).map(gid => [famName(gid).toLowerCase(), gid]));
+      inp.maxLength = max; inp.value = value; inp.placeholder = placeholder || (t ? `e.g. ${GT[t].eg}` : '');
+      $('#nmCancel').textContent = cancel;
+      const taken = new Map(Object.keys(FAM).filter(gid => t && gid !== except && gType(gid) === t).map(gid => [famName(gid).toLowerCase(), gid]));
       const list = [...new Set(sugg.filter(x => x && (!taken.has(x.toLowerCase()) || x === value)))].slice(0, 6);   // names already used are left out
       $('#nmSugg').innerHTML = (list.length ? `<div class="nm-label">Suggestions</div><div class="chips wrap">${list.map(x => `<button type="button" class="chip" data-nm="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '') +
         (hint ? `<p class="hint">${hint}</p>` : '');
       const check = () => {
         const v = inp.value.trim(), dup = v && taken.get(v.toLowerCase());
-        $('#nmCount').textContent = `${inp.value.length}/40`;
+        $('#nmCount').textContent = `${inp.value.length}/${max}`;
         $('#nmWarn').hidden = !dup; if (dup) $('#nmWarn').textContent = `A ${GT[t].label.toLowerCase()} called “${famName(dup)}” already exists. Pick a different name so you can tell them apart.`;
-        $('#nmOk').disabled = !v || !!dup || (except && v === famName(except));
+        $('#nmOk').disabled = (!v && !optional) || !!dup || (except && v === famName(except));
         $('#nmSugg').querySelectorAll('[data-nm]').forEach(b => b.classList.toggle('on', b.dataset.nm === v));
       };
       inp.oninput = check;
@@ -694,7 +696,7 @@
       $('#nmCancel').onclick = () => closeTop();
       $('#nmForm').onsubmit = e => {
         e.preventDefault(); if ($('#nmOk').disabled) return;
-        const v = inp.value.trim().slice(0, 40);
+        const v = inp.value.trim().slice(0, max);
         sh._onClose = null;
         const after = () => { removeEventListener('popstate', after); clearTimeout(tm); finish(v); };
         const tm = setTimeout(after, 500); addEventListener('popstate', after);
@@ -1456,10 +1458,12 @@
   const sha256 = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
   const randomSecret = () => [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
   // ask once for a device name, so others see who marked (e.g. "Ravi's phone")
-  function askDevName(force) {
+  async function askDevName(force) {
     if (cloud.devName && !force) return;
-    const v = prompt('Name this device so others can see who marked a voter (e.g. Ravi\'s phone):', cloud.devName);
-    if (v !== null && v.trim()) cloud.setDevName(v);
+    const v = await askName({ title: 'Name this device', t: null, label: 'Device name', value: cloud.devName, max: 30, ok: 'Save', cancel: force ? 'Cancel' : 'Skip',
+      sub: 'Others using the same sync code see this name next to the voters you mark, and in the list of devices online.', placeholder: 'e.g. Ravi’s phone',
+      optional: false });
+    if (v) cloud.setDevName(v);
   }
   const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const newCode = () => { const a = crypto.getRandomValues(new Uint8Array(8)); return 'PDG-' + [...a].map((x, i) => (i === 4 ? '-' : '') + CODE_CHARS[x % CODE_CHARS.length]).join(''); };
@@ -1517,8 +1521,9 @@
       drawSync();
     });
     const rename = async c => {
-      const v = prompt(`Name for ${c} (e.g. Family, Ward 3 team):`, cloud.nameOf(c));
-      if (v !== null && await cloud.rename(c, v)) toast(v.trim() ? 'Name saved' : 'Name removed');
+      const v = await askName({ title: cloud.nameOf(c) ? 'Rename this list' : 'Name this list', t: null, label: 'List name', value: cloud.nameOf(c), ok: 'Save', optional: true,
+        sub: `Sync code <b>${esc(c)}</b>. Everyone using it sees this name. Leave it empty to remove the name.`, placeholder: 'e.g. Family, Ward 3 team' });
+      if (v !== null && v !== cloud.nameOf(c) && await cloud.rename(c, v)) toast(v ? 'Name saved' : 'Name removed');
       drawSync();
     };
     box.onclick = e => {
@@ -1534,10 +1539,12 @@
       bindRecent();
       $('#syNew').onclick = async () => {
         const c = newCode();
-        askDevName();
+        await askDevName();
         await cloud.join(c);
         // claim the new code for this device, so only it can name the list
-        const v = prompt('Sync is on. Give this list a name (optional), e.g. Family or Ward 3 team:', '');
+        const v = await askName({ title: 'Sync is on', t: null, label: 'Name this list (optional)', ok: 'Save', cancel: 'Skip', optional: true,
+          sub: `Your sync code is <b>${esc(c)}</b>. A name helps you tell your lists apart. Only this device can change it.`, placeholder: 'e.g. Family, Ward 3 team',
+          sugg: ['Family', 'Ward 1 team', 'Office'] });
         await cloud.rename(c, v || '');
         cloud.remember(c);
         toast(cloud.err ? 'Saved here, will sync when online' : 'Sync is on');
@@ -1546,7 +1553,7 @@
       $('#syJoin').onclick = async () => {
         const c = cleanCode($('#syCode').value);
         if (!validCode(c)) { toast('Code looks like PDG-XXXX-XXXX'); return; }
-        askDevName();
+        await askDevName();
         await cloud.join(c); toast(cloud.err ? 'Could not reach the server, will retry' : 'Joined. Marks synced');
       };
       return;
@@ -1573,7 +1580,7 @@
       <button class="btn ghost w100 danger" id="syOff">Stop syncing on this device</button>`;
     bindRecent();
     $('#syNow').onclick = () => cloud.sync();
-    $('#syDev').onclick = () => { askDevName(true); drawSync(); cloud.sync(); };
+    $('#syDev').onclick = () => askDevName(true).then(() => { drawSync(); cloud.sync(); });
     $('#syCopy').onclick = async () => { try { await navigator.clipboard.writeText(cloud.code); toast('Code copied'); } catch { toast(cloud.code); } };
     $('#syShare').onclick = async () => {
       const text = `Pedagadi Voters sync code: ${cloud.code}\nOpen this link to sync marks:`;
@@ -1590,7 +1597,7 @@
     history.replaceState(null, '', location.pathname + location.search);
     if (hashCode !== cloud.code && cloud.ready && validCode(hashCode) &&
         confirm(`Sync marks with code ${hashCode}?${cloud.code ? '\nThis replaces your current code ' + cloud.code + '.' : ''}`))
-      (askDevName(), cloud.join(hashCode)).then(() => toast(cloud.err ? 'Will sync when online' : 'Joined. Marks synced'));
+      askDevName().then(() => cloud.join(hashCode)).then(() => toast(cloud.err ? 'Will sync when online' : 'Joined. Marks synced'));
   }
   drawSyncDot();
   cloud.sync();
