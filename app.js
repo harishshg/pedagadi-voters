@@ -45,12 +45,12 @@
   Object.values(FAM).forEach(g => { g.t = g.t || 'family'; g.v = g.v || {}; g.s = g.s || {}; g.x = g.x || {}; });
   const saveFam = () => LS.set('pv_fam', FAM);
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false }, saved, { q: '' });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false, frev: 'all' }, saved, { q: '' });
   if (S.view === 'family' && S.gtype === 'caste') S.view = 'caste';  // the old combined Groups tab
   if (saved.group) { if (((LS.get('pv_fam', {})[saved.group]) || {}).t === 'caste') S.cgrp = saved.group; else S.fgrp = saved.group; }
   S.rel = 'all'; S.marked = false;  // relation and "only marked" filters were removed from the panel
   const isGroupView = () => S.view === 'family' || S.view === 'caste';
-  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly });
+  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly, frev: S.frev });
   // surname index: standard spelling -> { te, en, n }
   const SURNAMES = new Map();
   V.forEach(v => { if (!v.surname) return; const s = SURNAMES.get(v.surname) || { te: v.surname, en: v.surname_en, n: 0 }; s.n++; SURNAMES.set(v.surname, s); });
@@ -165,14 +165,19 @@
     }
     if (isGroupView()) {
       const t = S.view, T = GT[t];
+      const allG = t === 'family' ? famGroups(t, true) : [];
       groups = famGroups(t);
+      const nDone = allG.filter(g => isReviewed(g.gid)).length;
+      const revTab = (k, l, n) => `<button class="${S.frev === k ? 'on' : ''}" data-frev="${k}">${l}<b>${n}</b></button>`;
+      const revBar = t === 'family' && allG.length ? `<div class="sn-tabs">${revTab('todo', 'Not reviewed', allG.length - nDone)}${revTab('done', 'Reviewed', nDone)}${revTab('all', 'All', allG.length)}</div>
+        <div class="sn-progress" title="${Math.round(nDone / allG.length * 100)}% of families reviewed"><i style="width:${Math.round(nDone / allG.length * 100)}%"></i></div>` : '';
       const nv = new Set(groups.flatMap(g => g.items.map(v => v.id))).size, any = Object.keys(FAM).some(gid => gType(gid) === t);
       $('#summary').textContent = `${groups.length} ${groups.length === 1 ? T.label.toLowerCase() : T.plural.toLowerCase()} · ${nv.toLocaleString()} voters`;
       const auto = t === 'family' ? autoFamPlan().length : 0;
       listEl.innerHTML = (auto ? `<div class="g-new"><button class="btn primary" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>
           <button class="btn" data-auto-fam>🏠 From houses (${auto})</button></div>`
-        : `<button class="btn primary w100 fam-new" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>`) +
-        (groups.length ? '' : `<div class="empty">${any ? `No ${T.label.toLowerCase()} matches.` : t === 'caste'
+        : `<button class="btn primary w100 fam-new" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>`) + revBar +
+        (groups.length ? '' : `<div class="empty">${any && t === 'family' && S.frev === 'todo' && !S.q.trim() ? '🎉 Every family is reviewed.' : any && t === 'family' && S.frev === 'done' && !S.q.trim() ? 'No family is reviewed yet.<br>Open a family, check its members and tap “Mark reviewed”.' : any ? `No ${T.label.toLowerCase()} matches.` : t === 'caste'
           ? 'No castes yet.<br>Tap “New caste”, or go to <b>Surnames</b>, select surnames and tap “Set caste”.'
           : 'No families yet.<br>Tap “New family”, or open a voter and tap “Add to group”.'}</div>`);
       more(); return;
@@ -494,6 +499,7 @@
   listEl.addEventListener('click', e => {
     const nw = e.target.closest('[data-new]'); if (nw) { famCreate(nw.dataset.new); return; }
     if (e.target.closest('[data-auto-fam]')) { autoFamilies(); return; }
+    const fr = e.target.closest('[data-frev]'); if (fr) { S.frev = fr.dataset.frev; saveState(); render(); if (selecting) drawSelBar(); return; }
     const sf = e.target.closest('[data-snf]'); if (sf) { S.snf = sf.dataset.snf; saveState(); render(); if (selecting) drawSelBar(); return; }
     const ss = e.target.closest('[data-snsort]'); if (ss) { S.snsort = ss.dataset.snsort; saveState(); render(); return; }
     const sr = e.target.closest('[data-sn]');
@@ -800,7 +806,16 @@
   }
 
   // the Groups tab
-  function famGroups(t) {
+  const isReviewed = gid => FAM[gid] && typeof FAM[gid].r === 'string';
+  function setReviewed(gid, on) {
+    const g = FAM[gid]; if (!g) return;
+    if (on) g.r = cloud.myName || ''; else delete g.r;
+    cloud.put('R', gid, on ? g.r : null); famChanged();
+  }
+  function famGroups(t, allReview) {
+    return famGroupsAll(t).filter(g => allReview || t !== 'family' || S.frev === 'all' || (S.frev === 'done') === isReviewed(g.gid));
+  }
+  function famGroupsAll(t) {
     const filtering = S.q.trim() || S.ward || S.caste !== 'all' || S.rel !== 'all' || S.surname || S.cgrp || S.fgrp || S.marked;
     const ok = new Set(current.map(v => v.id));
     return Object.keys(FAM).filter(gid => gType(gid) === t).map(gid => {
@@ -811,7 +826,7 @@
   }
   function famHTML(g) {
     const show = g.items.slice(0, 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
-    return `<div class="house fam"><div class="house-h"><span>${GT[g.t].icon} ${esc(g.name)}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
+    return `<div class="house fam"><div class="house-h"><span>${GT[g.t].icon} ${esc(g.name)}${g.t === 'family' && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button></div>
       ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
       ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
@@ -856,6 +871,11 @@
   }
   const snLabel = k => { const s = SURNAMES.get(k); return s ? `${s.te} · ${s.en}` : k; };
 
+  // the next family still to review, in the order the Families tab shows them
+  function nextUnreviewed(gid) {
+    const order = famGroupsAll('family').map(g => g.gid), i = order.indexOf(gid);
+    return [...order.slice(i + 1), ...order.slice(0, Math.max(i, 0))].find(id => id !== gid && !isReviewed(id)) || '';
+  }
   function showFam(gid, replace) {
     if (!FAM[gid]) { toast('This group was deleted'); return; }
     const g = FAM[gid], t = gType(gid); $('#famSheet')._gid = gid;
@@ -870,6 +890,9 @@
       <div class="en">${esc(v.name_en)} · ${extra}</div></div></button>${btn}</div>`;
     $('#fam').innerHTML = `<h2>${GT[t].icon} ${esc(famName(gid))}</h2>
       <p class="fam-sub">${GT[t].label} group · ${mem.length.toLocaleString()} voter${mem.length === 1 ? '' : 's'}${mem.length ? ' · ' + Object.keys(wards).sort((a, b) => a - b).map(w => `W${w}: ${wards[w]}`).join(', ') : ''}</p>
+      ${t === 'family' ? (isReviewed(gid)
+        ? `<div class="rev-box done"><span>✓ Reviewed${g.r ? ' by ' + esc(g.r) : ''}</span><button class="btn" id="fUnrev">Undo</button>${nextUnreviewed(gid) ? '<button class="btn primary" id="fNext">Next ›</button>' : ''}</div>`
+        : `<div class="rev-box"><span>Not reviewed yet. Check the members, add or remove people, then mark it.</span><button class="btn primary" id="fRev">✓ Mark reviewed</button></div>`) : ''}
       <div class="d-actions"><button class="btn" id="fShow">Show in list</button><button class="btn" id="fRename">Rename</button><button class="btn danger" id="fDelete">Delete</button></div>
       <h3>Surnames in this group</h3>
       <div class="fam-dd">${sn.map(k => `<span class="fam-chip sn">${esc(snLabel(k))} <small>${SURNAMES.get(k) ? SURNAMES.get(k).n : ''}</small><button data-sn-rm="${esc(k)}" aria-label="Remove surname">×</button></span>`).join('')}
@@ -891,6 +914,10 @@
     const box = $('#fam');
     box.querySelector('#fClose').onclick = () => closeTop();
     box.querySelector('#fShow').onclick = () => showGroupInList(gid);
+    const on = (id, fn) => { const b = box.querySelector(id); if (b) b.onclick = fn; };
+    on('#fRev', () => { setReviewed(gid, true); showFam(gid, true); toast('Family marked reviewed'); });
+    on('#fUnrev', () => { setReviewed(gid, false); showFam(gid, true); });
+    on('#fNext', () => { const n = nextUnreviewed(gid); if (n) { showFam(n, true); $('#famSheet').scrollTop = 0; } });
     if (box.querySelector('#fShow2')) box.querySelector('#fShow2').onclick = () => showGroupInList(gid);
     box.querySelector('#fRename').onclick = () => {
       const n = prompt('New name for this group:', g.name); if (!n || !n.trim()) return;
@@ -1044,7 +1071,7 @@
     put(type, id, val) {
       if (!this.code) return;
       // deleting a family group drops any member changes for it that are still waiting
-      if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TVSX]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
+      if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TRVSX]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
       this.q[type + ':' + id] = val; if (!this.hold) LS.set('pv_sync_q', this.q);
       if (type === 'm' || type === 'n') {
         if (val === null) delete this.who[type + ':' + id]; else this.who[type + ':' + id] = { by: this.myName, d: this.dev, t: Date.now() };
@@ -1065,10 +1092,11 @@
         const mask = part.flatMap(k => {
           const [t, id] = [k[0], k.slice(2)], val = this.q[k]; sent[k] = val;
           // groups: g.<gid>.name, g.<gid>.t, and g.<gid>.v / .s / .x .<key> (voters, surnames, taken out)
-          if ('GTVSX'.includes(t)) {
+          if ('GTRVSX'.includes(t)) {
             const [gid, key] = id.split('|'), gf = body.fields.g.mapValue.fields;
             if (t === 'G' && val === null) return [path(['g', gid])];
             const grp = gf[gid] || (gf[gid] = { mapValue: { fields: { v: F(), s: F(), x: F() } } });
+            if (t === 'R') { if (val !== null) grp.mapValue.fields.r = { stringValue: String(val) }; return [path(['g', gid, 'r'])]; }
             if (t === 'G' || t === 'T') { const f = t === 'G' ? 'name' : 't'; grp.mapValue.fields[f] = { stringValue: String(val) }; return [path(['g', gid, f])]; }
             const f = t.toLowerCase();
             if (val !== null) grp.mapValue.fields[f].mapValue.fields[key] = { booleanValue: true };
@@ -1110,6 +1138,7 @@
         const gf = (x.mapValue && x.mapValue.fields) || {};
         const set = k => { const o = {}; Object.entries((gf[k] && gf[k].mapValue && gf[k].mapValue.fields) || {}).forEach(([id, b]) => { if (b.booleanValue) o[id] = true; }); return o; };
         g[gid] = { name: (gf.name && gf.name.stringValue) || '', t: (gf.t && gf.t.stringValue) || 'family', v: set('v'), s: set('s'), x: set('x') };
+        if (gf.r && typeof gf.r.stringValue === 'string') g[gid].r = gf.r.stringValue;
       });
       return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {}, name: str('name'), owner: str('owner'), p, who, g };
     },
@@ -1172,11 +1201,12 @@
       // family groups: cloud copy + changes still waiting to be sent
       const g = JSON.parse(JSON.stringify(d.g || {}));
       Object.entries(this.q).forEach(([k, val]) => {
-        const t = k[0]; if (!'GTVSX'.includes(t)) return;
+        const t = k[0]; if (!'GTRVSX'.includes(t)) return;
         const [gid, key] = k.slice(2).split('|');
         if (t === 'G' && val === null) { delete g[gid]; return; }
         const grp = g[gid] = g[gid] || { name: '', t: 'family', v: {}, s: {}, x: {} };
         if (t === 'G') grp.name = val; else if (t === 'T') grp.t = val;
+        else if (t === 'R') { if (val === null) delete grp.r; else grp.r = val; }
         else { const f = t.toLowerCase(); if (val) grp[f][key] = true; else delete grp[f][key]; }
       });
       if (JSON.stringify(g) !== JSON.stringify(FAM)) {
