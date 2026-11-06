@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=50">
+<link rel="stylesheet" href="style.css?v=51">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -274,13 +274,14 @@
   <button id="selX" class="sel-x" aria-label="Stop selecting">✕</button>
   <span id="selN" class="sel-n">0 selected</span>
   <button id="selAll" class="sel-b">All</button>
-  <button id="selMark" class="sel-b">★ Mark</button>
+  <button id="selMark" class="sel-b" aria-label="Mark selected">★<span> Mark</span></button>
+  <button id="selShare" class="sel-b wa-b" aria-label="Share slips of the selected voters">📲 Share</button>
   <button id="selGroup" class="sel-b primary">＋ Group</button>
 </div>
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=50"></script>
-<script src="app.js?v=50"></script>
+<script src="data.js?v=51"></script>
+<script src="app.js?v=51"></script>
 </body>
 </html>

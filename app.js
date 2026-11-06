@@ -863,8 +863,8 @@
     const bar = $('#selBar'); bar.hidden = !selecting;
     document.body.classList.toggle('has-selbar', selecting);
     $('#selN').innerHTML = `${sel.size}<span> selected</span>`;
-    $('#selMark').disabled = $('#selGroup').disabled = !sel.size;
-    $('#selMark').hidden = S.view === 'surnames';
+    $('#selMark').disabled = $('#selGroup').disabled = $('#selShare').disabled = !sel.size;
+    $('#selMark').hidden = $('#selShare').hidden = S.view === 'surnames';
     $('#selGroup').textContent = S.view === 'surnames' ? '🏷️ Set caste' : '＋ Group';
     const all = visibleIds();
     $('#selAll').textContent = all.length && all.every(id => sel.has(id)) ? 'Clear' : `All ${all.length.toLocaleString()}`;
@@ -912,6 +912,11 @@
     toast(`${on ? 'Marked' : 'Unmarked'} ${ids.length}`);
   };
   $('#selGroup').onclick = () => S.view === 'surnames' ? showBulkSnPick() : showBulkPick();
+  // share slips (image or WhatsApp text) of the selected voters, in roll order
+  $('#selShare').onclick = () => {
+    const vs = [...sel].map(id => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
+    if (vs.length) showSlips(vs, vs.length > 1 ? 'Selected voters' : '');
+  };
   // add the selected voters to a group
   function showBulkPick(again) {
     const ids = [...sel], n = ids.length;

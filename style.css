@@ -293,6 +293,9 @@ mark{background:#ffe58a;color:inherit;border-radius:3px;padding:0 1px}
 .sel-b{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;font-weight:600;white-space:nowrap}
 .sel-b.primary{background:var(--brand);border-color:var(--brand);color:#fff}
 .sel-b:disabled{opacity:.45}
+.sel-b.wa-b{border-color:#25d366;color:#128c4b}
+@media (max-width:429px){.sel-b{padding:8px 8px}.sel-bar{gap:5px}}
+@media (max-width:399px){#selMark span{display:none}#selMark{min-width:36px}}
 body.has-selbar main{padding-bottom:80px}
 @media (max-width:359px){.sel-b{padding:8px 7px;font-size:12.5px}.sel-n{font-size:13px}}
 .sel-n{flex:none}
