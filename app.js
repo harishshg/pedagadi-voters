@@ -168,7 +168,10 @@
       groups = famGroups(t);
       const nv = new Set(groups.flatMap(g => g.items.map(v => v.id))).size, any = Object.keys(FAM).some(gid => gType(gid) === t);
       $('#summary').textContent = `${groups.length} ${groups.length === 1 ? T.label.toLowerCase() : T.plural.toLowerCase()} · ${nv.toLocaleString()} voters`;
-      listEl.innerHTML = `<button class="btn primary w100 fam-new" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>` +
+      const auto = t === 'family' ? autoFamPlan().length : 0;
+      listEl.innerHTML = (auto ? `<div class="g-new"><button class="btn primary" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>
+          <button class="btn" data-auto-fam>🏠 From houses (${auto})</button></div>`
+        : `<button class="btn primary w100 fam-new" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>`) +
         (groups.length ? '' : `<div class="empty">${any ? `No ${T.label.toLowerCase()} matches.` : t === 'caste'
           ? 'No castes yet.<br>Tap “New caste”, or go to <b>Surnames</b>, select surnames and tap “Set caste”.'
           : 'No families yet.<br>Tap “New family”, or open a voter and tap “Add to group”.'}</div>`);
@@ -490,6 +493,7 @@
   }
   listEl.addEventListener('click', e => {
     const nw = e.target.closest('[data-new]'); if (nw) { famCreate(nw.dataset.new); return; }
+    if (e.target.closest('[data-auto-fam]')) { autoFamilies(); return; }
     const sf = e.target.closest('[data-snf]'); if (sf) { S.snf = sf.dataset.snf; saveState(); render(); if (selecting) drawSelBar(); return; }
     const ss = e.target.closest('[data-snsort]'); if (ss) { S.snsort = ss.dataset.snsort; saveState(); render(); return; }
     const sr = e.target.closest('[data-sn]');
@@ -749,6 +753,52 @@
     return gid;
   }
 
+  // families made from houses: every house with 3 or more voters who are not in a family yet.
+  // The id comes from the ward and house number, so two devices on one sync code make the same family, not two.
+  function autoFamPlan() {
+    const inFam = new Set();
+    Object.keys(FAM).forEach(gid => { if (gType(gid) === 'family') gMembers(gid).forEach((_, id) => inFam.add(id)); });
+    const used = new Set(), plan = [];
+    [...households.entries()].filter(([k, vs]) => vs[0].house_no)
+      .sort((a, b) => a[1][0].ward - b[1][0].ward || natural(a[1][0].house_no, b[1][0].house_no))
+      .forEach(([k, vs]) => {
+        const free = vs.filter(v => !inFam.has(v.id));
+        if (free.length < 3) return;
+        const base = 'h' + vs[0].ward + '-' + vs[0].house_no.replace(/[^A-Za-z0-9]/g, '_');
+        let gid = base, i = 2; while (used.has(gid)) gid = base + '-' + i++;
+        used.add(gid);
+        if (!FAM[gid]) plan.push({ gid, vs: free });
+      });
+    return plan;
+  }
+  const eldestOf = vs => vs.reduce((a, b) => (+b.age || 0) > (+a.age || 0) ? b : a, vs[0]);  // no ages: the first in the roll
+  function firstName(v) {
+    const sn = (v.surname_en || '').toLowerCase(), w = (v.name_en || '').split(/\s+/).filter(x => x && x.toLowerCase() !== sn);
+    return w.join(' ') || v.name_en || v.name;
+  }
+  function autoFamName(vs, taken) {
+    const c = new Map(); vs.forEach(v => { const k = v.surname_en || v.surname; if (k) c.set(k, (c.get(k) || 0) + 1); });
+    const old = eldestOf(vs), top = Math.max(0, ...c.values());
+    const sn = top ? ((old.surname_en || old.surname) && c.get(old.surname_en || old.surname) === top ? (old.surname_en || old.surname) : [...c.keys()].find(k => c.get(k) === top)) : '';
+    const tries = sn ? [sn, `${sn} (${firstName(old)})`, `${sn} (${firstName(old)}, ${old.house_no})`] : [`House ${old.house_no}`, `House ${old.house_no}, Ward ${old.ward}`];
+    let name = tries.find(n => !taken.has(n.toLowerCase())) || tries[tries.length - 1], i = 2;
+    while (taken.has(name.toLowerCase())) name = `${tries[tries.length - 1]} ${i++}`;
+    name = name.slice(0, 40); taken.add(name.toLowerCase()); return name;
+  }
+  function autoFamilies() {
+    const plan = autoFamPlan();
+    if (!plan.length) { toast('Every house with 3 or more voters already has a family'); return; }
+    const n = plan.reduce((a, p) => a + p.vs.length, 0);
+    if (!confirm(`Make ${plan.length} families from houses with 3 or more voters (${n.toLocaleString()} voters)?\n\nEach is named after the house's surname. If that name is already used, the eldest member's name is added. You can rename any family later.${cloud.code ? '\n\nEveryone using your sync code will see them.' : ''}`)) return;
+    const taken = new Set(Object.keys(FAM).filter(gid => gType(gid) === 'family').map(gid => famName(gid).toLowerCase()));
+    cloud.many(() => plan.forEach(p => {
+      const name = autoFamName(p.vs, taken);
+      FAM[p.gid] = { name, t: 'family', v: {}, s: {}, x: {} }; cloud.put('G', p.gid, name); cloud.put('T', p.gid, 'family');
+      p.vs.forEach(v => gSet(p.gid, 'v', v.id, true));
+    }));
+    famChanged(); toast(`${plan.length} families made from houses`);
+  }
+
   // the Groups tab
   function famGroups(t) {
     const filtering = S.q.trim() || S.ward || S.caste !== 'all' || S.rel !== 'all' || S.surname || S.cgrp || S.fgrp || S.marked;
@@ -995,7 +1045,7 @@
       if (!this.code) return;
       // deleting a family group drops any member changes for it that are still waiting
       if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TVSX]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
-      this.q[type + ':' + id] = val; LS.set('pv_sync_q', this.q);
+      this.q[type + ':' + id] = val; if (!this.hold) LS.set('pv_sync_q', this.q);
       if (type === 'm' || type === 'n') {
         if (val === null) delete this.who[type + ':' + id]; else this.who[type + ':' + id] = { by: this.myName, d: this.dev, t: Date.now() };
         LS.set('pv_who', this.who);
@@ -1003,6 +1053,8 @@
       clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), type === 'n' ? 1200 : 300);
       drawSyncDot();
     },
+    // many changes at once: save the queue once at the end
+    many(fn) { this.hold = true; try { fn(); } finally { this.hold = false; if (this.code) { LS.set('pv_sync_q', this.q); clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), 300); drawSyncDot(); } } },
     async flush() {
       const keys = Object.keys(this.q);
       for (let i = 0; i < keys.length; i += 80) {
