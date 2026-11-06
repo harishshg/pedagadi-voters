@@ -525,51 +525,71 @@
     im.onload = () => { clearTimeout(t); res(im); }; im.onerror = () => { clearTimeout(t); res(null); };
     im.src = src;
   });
-  // one PNG with a header and a slip card for each voter
+  // one PNG laid out like the ward PDF: page header, then a box per voter (1 column for one voter, 2 for more)
+  const CASTE_TE = { SC: 'షె.కు.', ST: 'షె.తె.', BC: 'వె.త.' };
+  const REL_TE = { Father: 'తండ్రి పేరు', Husband: 'భర్త పేరు', Mother: 'తల్లి పేరు', Wife: 'భార్య పేరు' };
   async function slipImage(vs, title, part) {
     try { await document.fonts.ready; } catch { }
-    const W = 720, K = 2, HEAD = title ? 96 : 76, CARD = 214, GAP = 12, FOOT = 34;
-    const H = HEAD + vs.length * (CARD + GAP) + FOOT;
-    const cv = document.createElement('canvas'); cv.width = W * K; cv.height = H * K;
-    const c = cv.getContext('2d'); c.scale(K, K);
-    const font = (w, px) => c.font = `${w} ${px}px ${SLIP_FONT}`;
+    const cols = vs.length > 1 ? 2 : 1, rows = Math.ceil(vs.length / cols);
+    const S = cols === 1 ? 6 : 4;                      // canvas pixels per PDF point
+    const BW = 174, BH = 70, G = 2, M = 6, HEAD = title ? 54 : 46, FOOT = 14;
+    const W = M * 2 + cols * BW + (cols - 1) * G, H = M + HEAD + rows * (BH + G) - G + FOOT + M;
+    const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
+    const c = cv.getContext('2d'); c.scale(S, S);
+    const TE = (w, px) => c.font = `${w} ${px}px ${SLIP_FONT}`;
+    const NUM = px => c.font = `700 ${px}px "Times New Roman",Times,serif`;
     const fit = (s, max) => { s = String(s ?? ''); if (c.measureText(s).width <= max) return s; while (s && c.measureText(s + '…').width > max) s = s.slice(0, -1); return s + '…'; };
-    const text = (s, x, y, max, color = '#111827') => { c.fillStyle = color; c.fillText(fit(s, max), x, y); };
-    const round = (x, y, w, h, r) => { c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h); };
-    c.fillStyle = '#eef3f8'; c.fillRect(0, 0, W, H);
-    c.fillStyle = '#1f4e79'; c.fillRect(0, 0, W, HEAD);
-    c.textBaseline = 'alphabetic';
-    font(700, 24); text(`🗳️ ఓటర్ స్లిప్ · Voter slip${vs.length > 1 ? 's' : ''}`, 20, 36, W - 40, '#fff');
-    font(500, 15); text(SLIP_HEAD, 20, 60, W - 40, '#d6e4f2');
-    if (title) { font(700, 16); text(`👪 ${title} · ${vs.length} voter${vs.length === 1 ? '' : 's'}${part ? ` · ${part}` : ''}`, 20, 84, W - 40, '#fff'); }
+    const put = (s, x, y, max = 999, align = 'left') => { c.textAlign = align; c.fillText(fit(s, max), x, y); return c.measureText(fit(s, max)).width; };
+    // runs of [font-setter, text] drawn one after another; returns the end x
+    const runs = (list, x, y) => { list.forEach(([f, t]) => { f(); c.textAlign = 'left'; c.fillText(t, x, y); x += c.measureText(t).width; }); return x; };
+    const wards = [...new Set(vs.map(v => v.ward))].sort((a, b) => a - b), mixed = wards.length > 1;
+    c.fillStyle = '#fff'; c.fillRect(0, 0, W, H);
+    c.strokeStyle = '#000'; c.lineWidth = 0.6; c.strokeRect(M - 2, M - 2, W - 2 * M + 4, H - 2 * M + 4);
+    c.fillStyle = '#000'; c.textBaseline = 'alphabetic';
+    const mid = W / 2;
+    TE(700, 9.5); put('పెదగాడి గ్రామ పంచాయతీ ఓటర్ల జాబితా - 2026', mid, M + 10, W - 2 * M, 'center');
+    TE(700, 8); put('పెందుర్తి శాసనసభ నియోజకవర్గము', mid, M + 20, W - 2 * M, 'center');
+    const L = M + 1, R = W - M - 1;
+    TE(400, 8.5); runs([[() => TE(400, 8.5), 'గ్రామ పంచాయతీ : '], [() => TE(700, 8.5), 'పెదగాడి']], L, M + 32);
+    runs([[() => TE(400, 8.5), 'మండలము : '], [() => TE(700, 8.5), 'పెందుర్తి']], L, M + 42);
+    const wardTxt = wards.join(', ');
+    TE(400, 8.5); let w1 = c.measureText('వార్డు నెంబరు : ').width; NUM(9); w1 += c.measureText(wardTxt).width;
+    runs([[() => TE(400, 8.5), 'వార్డు నెంబరు : '], [() => NUM(9), wardTxt]], R - w1, M + 32);
+    TE(400, 8.5); let w2 = c.measureText('జిల్లా : ').width; TE(700, 8.5); w2 += c.measureText('విశాఖపట్నం').width;
+    runs([[() => TE(400, 8.5), 'జిల్లా : '], [() => TE(700, 8.5), 'విశాఖపట్నం']], R - w2, M + 42);
+    if (title) { TE(700, 7); c.fillStyle = '#1f4e79'; put(`${title} · ${vs.length} ఓటర్లు${part ? ` · ${part}` : ''}`, mid, M + 51, W - 2 * M, 'center'); c.fillStyle = '#000'; }
     const photos = await Promise.all(vs.map(v => v.photo ? loadImg('photos/' + v.photo) : null));
     vs.forEach((v, i) => {
-      const y = HEAD + GAP + i * (CARD + GAP), x = 12, w = W - 24;
-      c.save(); c.shadowColor = 'rgba(0,0,0,.08)'; c.shadowBlur = 6; c.shadowOffsetY = 1;
-      c.fillStyle = '#fff'; round(x, y, w, CARD, 14); c.fill(); c.restore();
-      // photo (cover-fit), or a grey box
-      const px = x + 16, py = y + 16, pw = 96, ph = 118, im = photos[i];
-      c.save(); round(px, py, pw, ph, 10); c.clip(); c.fillStyle = '#e5e7eb'; c.fillRect(px, py, pw, ph);
-      if (im) { const s = Math.max(pw / im.width, ph / im.height), iw = im.width * s, ih = im.height * s; c.drawImage(im, px + (pw - iw) / 2, py + (ph - ih) / 2, iw, ih); }
-      c.restore();
-      const tx = px + pw + 18, tw = x + w - 16 - tx;
-      font(700, 23); text(v.name || v.name_en || '—', tx, y + 44, tw);
-      font(600, 17); text(v.name_en, tx, y + 70, tw, '#374151');
-      font(400, 15); text(`${v.relation}: ${v.relation_name || '—'}`, tx, y + 96, tw, '#4b5563');
-      font(400, 14); text(v.relation_name_en || '', tx, y + 116, tw, '#6b7280');
-      // field boxes along the bottom
-      const fields = [['Ward', v.ward], ['Serial No.', v.serial], ['House No.', v.house_no || '—'], ['EPIC No.', v.epic || '—'], ['Age', v.age || '—']];
-      const fy = y + 146, fh = 54, fx0 = x + 16, fw = w - 32, widths = [0.13, 0.17, 0.22, 0.34, 0.14];
-      let fx = fx0;
-      fields.forEach(([lab, val], j) => {
-        const cw = fw * widths[j] - (j < fields.length - 1 ? 6 : 0);
-        c.fillStyle = j === 1 ? '#e8f0f8' : '#f3f4f6'; round(fx, fy, cw, fh, 8); c.fill();
-        font(600, 11.5); text(lab.toUpperCase(), fx + 9, fy + 18, cw - 14, '#6b7280');
-        font(700, j === 1 ? 21 : 17); text(val, fx + 9, fy + 43, cw - 14, j === 1 ? '#1f4e79' : '#111827');
-        fx += cw + 6;
-      });
+      const x = M + (i % cols) * (BW + G), y = M + HEAD + Math.floor(i / cols) * (BH + G);
+      c.lineWidth = 0.6; c.strokeStyle = '#000'; c.strokeRect(x, y, BW, BH);
+      const lx = x + 3, vx = x + 45;
+      // top line: serial no. in a small box, AC list ref on the right
+      TE(400, 6.2); let ex = runs([[() => TE(400, 6.2), 'గ్రా.పం.ఓ.జా.వ.సం . ']], lx, y + 9);
+      NUM(7.5); const sw = Math.max(c.measureText(String(v.serial)).width + 6, 13);
+      c.lineWidth = 0.6; c.strokeRect(ex, y + 2.3, sw, 9); c.textAlign = 'center'; c.fillText(String(v.serial), ex + sw / 2, y + 9.4);
+      if (mixed) { TE(700, 6); c.textAlign = 'left'; c.fillText(`వార్డు ${v.ward}`, ex + sw + 3, y + 9); }
+      TE(400, 6.2); let aw = c.measureText('అ.ఓ.జా.వ.సం .').width; NUM(6.8); const ac = `${31} - ${v.ac_part} - ${v.ac_serial}`; aw += c.measureText(ac).width;
+      runs([[() => TE(400, 6.2), 'అ.ఓ.జా.వ.సం .'], [() => NUM(6.8), ac]], x + BW - 2 - aw, y + 9);
+      // photo on the right
+      const px = x + 132, py = y + 26, pw = 40, ph = 41, im = photos[i];
+      c.fillStyle = '#f3f4f6'; c.fillRect(px, py, pw, ph); c.fillStyle = '#000';
+      if (im) { c.save(); c.beginPath(); c.rect(px, py, pw, ph); c.clip(); const s = Math.max(pw / im.width, ph / im.height), iw = im.width * s, ih = im.height * s; c.drawImage(im, px + (pw - iw) / 2, py + (ph - ih) / 2, iw, ih); c.restore(); }
+      const vmax = x + 130 - vx;
+      TE(400, 6.2); c.textAlign = 'left';
+      c.fillText('ఓటరు పేరు', lx, y + 21); put(': ' + (v.name || v.name_en || ''), vx, y + 21, x + BW - 3 - vx);
+      c.fillText(REL_TE[v.relation] || 'ఇతరులు', lx, y + 34); put(': ' + (v.relation_name || v.relation_name_en || ''), vx, y + 34, vmax);
+      c.fillText('ఇంటి సంఖ్య', lx, y + 48);
+      runs([[() => TE(700, 6.2), ': '], [() => NUM(6.8), v.house_no || '--']], vx, y + 48);
+      TE(400, 6.2); c.fillText('కులము :', x + 78, y + 48);
+      TE(700, 6.8); c.fillText(CASTE_TE[v.caste] || '--', x + 107, y + 48);
+      runs([[() => TE(400, 6.2), 'ఓటరు ఐడి. కార్డు నెం. : '], [() => NUM(6.8), v.epic || '--']], lx, y + 64);
+      // English name under the Telugu one, small and grey, so it can be read by anyone
+      if (v.name_en) { c.fillStyle = '#555'; NUM(0); c.font = `italic 5px system-ui,sans-serif`; put(v.name_en, vx + 3, y + 27, vmax - 3); c.fillStyle = '#000'; }
     });
-    font(400, 12); text('Details from the Pedagadi 2026 electoral roll. Carry this slip and your ID to the polling station.', 20, H - 13, W - 40, '#6b7280');
+    const fy = H - M - 3;
+    runs([[() => TE(400, 7.5), 'వయస్సు లెక్కింపు తేదీ : '], [() => NUM(8), '01-01-2026']], L, fy);
+    TE(400, 7.5); let fw = c.measureText('ప్రచురణ తేదీ : ').width; NUM(8); fw += c.measureText('15-04-2026').width;
+    runs([[() => TE(400, 7.5), 'ప్రచురణ తేదీ : '], [() => NUM(8), '15-04-2026']], R - fw, fy);
     return new Promise(res => cv.toBlob(res, 'image/png'));
   }
   const slipFileName = (vs, title, part) => (title ? title.replace(/[^\wఀ-౿ -]+/g, '').trim().replace(/\s+/g, '-') + '-voter-slips' : `voter-slip-${vs[0].epic || vs[0].id}`) + (part ? `-${part.replace(/\D+/g, '-').replace(/^-|-$/g, '')}` : '') + '.png';
