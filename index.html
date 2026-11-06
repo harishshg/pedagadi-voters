@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=41">
+<link rel="stylesheet" href="style.css?v=42">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -77,6 +77,8 @@
       <div id="fsFamily"></div>
       <h3>Category in the roll</h3>
       <div class="chips wrap" id="casteChips"></div>
+      <h3>Phone number</h3>
+      <div class="chips wrap" id="phoneChips"></div>
       <div id="fsSort"><h3>Sort by</h3><div class="chips wrap" id="sortChips"></div></div>
     </div>
     <div class="sheet-actions">
@@ -132,6 +134,23 @@
       <div id="nmSugg"></div>
       <div class="sheet-actions"><button type="button" class="btn" id="nmCancel">Cancel</button><button type="submit" class="btn primary" id="nmOk"></button></div>
     </form>
+  </div>
+</div>
+
+<!-- Phone numbers of one voter -->
+<div class="sheet-backdrop" id="phoneSheet" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="phTitle">
+    <div class="grab"></div>
+    <h2 id="phTitle">Phone numbers</h2>
+    <p class="fam-sub" id="phWho"></p>
+    <div id="phList"></div>
+    <form id="phForm" autocomplete="off">
+      <label class="nm-label" for="phInput">Add a number</label>
+      <div class="nm-field"><span class="ph-cc">+91</span><input id="phInput" type="tel" inputmode="tel" maxlength="16" placeholder="98765 43210" enterkeyhint="done"><button class="btn primary ph-add" id="phAdd" type="submit">Add</button></div>
+      <p class="nm-warn" id="phWarn" hidden></p>
+    </form>
+    <p class="hint" id="phHint"></p>
+    <div class="sheet-actions"><button class="btn primary" id="phDone" type="button">Done</button></div>
   </div>
 </div>
 
@@ -218,7 +237,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=41"></script>
-<script src="app.js?v=41"></script>
+<script src="data.js?v=42"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>

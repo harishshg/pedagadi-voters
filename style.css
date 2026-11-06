@@ -407,3 +407,14 @@ body.has-selbar main{padding-bottom:80px}
 .nm-field span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .nm-warn{margin:8px 0 0;font-size:13px;color:#b45309}
 .btn:disabled{opacity:.45}
+
+/* phone numbers */
+.has-ph{font-size:12px;color:var(--brand);font-weight:700}
+.ph-dd{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.ph-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ph-call{color:var(--brand);text-decoration:none;font-weight:700;font-variant-numeric:tabular-nums}
+.ph-wa{font-size:12px;font-weight:700;color:#fff;background:#1fa855;border-radius:999px;padding:3px 10px;text-decoration:none}
+.ph-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.ph-item a{color:var(--ink);font-weight:700;font-size:16px;text-decoration:none;font-variant-numeric:tabular-nums}
+.ph-cc{font-weight:700;color:var(--muted)}
+.ph-add{flex:none;padding:8px 16px;margin:4px -6px 4px 0}
