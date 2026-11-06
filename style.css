@@ -432,3 +432,16 @@ body.has-selbar main{padding-bottom:80px}
 .ask-body ul{margin:8px 0;padding-left:20px;color:var(--muted);font-size:14px}
 .ask-body li{margin:4px 0}
 .btn.danger-fill{background:#dc2626;border-color:#dc2626;color:#fff}
+
+/* voter slip sheet */
+.slip-prev{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;border-radius:12px;background:var(--accent);padding:8px}
+.slip-prev img{width:100%;height:auto;display:block;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.slip-acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.slip-acts .btn{display:flex;align-items:center;justify-content:center;gap:8px;flex:none}
+.slip-acts .btn[disabled]{opacity:.55}
+.slip-to{display:flex;flex-wrap:wrap;gap:6px}
+.slip-to .btn{flex:1 1 45%;font-size:13.5px;padding:9px 6px}
+.wa-slip{margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px}
+.slip-link{float:right;text-transform:none;cursor:pointer;border:0;background:none;color:var(--brand);font-weight:700;font-size:12.5px;padding:0 0 0 8px}
+.btn.wa{background:#25d366;border-color:#25d366;color:#fff}
+.btn.wa-out{border-color:#25d366;color:#128c4b}

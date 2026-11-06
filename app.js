@@ -511,6 +511,118 @@
   function textOf(v) {
     return `${v.name} (${v.name_en}) – Ward ${v.ward}\n${v.relation}: ${v.relation_name} (${v.relation_name_en})\nWard ${v.ward} · Serial ${v.serial} · House ${v.house_no || '—'}\nEPIC: ${v.epic}\nAC list: 31-${v.ac_part}-${v.ac_serial}${phonesOf(v.id).length ? '\nPhone: ' + phonesOf(v.id).map(fmtPhone).join(', ') : ''}`;
   }
+  // ---------- voter slips (image or text, shared to WhatsApp) ----------
+  const WA_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3.9 2.5c.1.2 1.6 2.5 3.9 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.2-.2-.5-.3z"/></svg>';
+  const SLIP_HEAD = 'Pedagadi Gram Panchayat Elections 2026';
+  const slipLine = v => `*${v.name || v.name_en}*${v.name && v.name_en ? ` (${v.name_en})` : ''}\n${v.relation}: ${v.relation_name || '—'}${v.relation_name_en ? ` (${v.relation_name_en})` : ''}\nWard ${v.ward} · Serial No. *${v.serial}* · House ${v.house_no || '—'}\nEPIC: ${v.epic || '—'}${v.age ? ` · Age ${v.age}` : ''}`;
+  function slipText(vs, title) {
+    return `🗳️ *Voter slip${vs.length > 1 ? 's' : ''}* – ${SLIP_HEAD}${title ? `\n👪 ${title} (${vs.length} voters)` : ''}\n\n`
+      + vs.map((v, i) => (vs.length > 1 ? `${i + 1}. ` : '') + slipLine(v)).join('\n\n');
+  }
+  const SLIP_FONT = '"Noto Sans Telugu","Kohinoor Telugu","Telugu Sangam MN","Nirmala UI",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const loadImg = src => new Promise(res => {
+    const im = new Image(), t = setTimeout(() => res(null), 5000);
+    im.onload = () => { clearTimeout(t); res(im); }; im.onerror = () => { clearTimeout(t); res(null); };
+    im.src = src;
+  });
+  // one PNG with a header and a slip card for each voter
+  async function slipImage(vs, title, part) {
+    try { await document.fonts.ready; } catch { }
+    const W = 720, K = 2, HEAD = title ? 96 : 76, CARD = 214, GAP = 12, FOOT = 34;
+    const H = HEAD + vs.length * (CARD + GAP) + FOOT;
+    const cv = document.createElement('canvas'); cv.width = W * K; cv.height = H * K;
+    const c = cv.getContext('2d'); c.scale(K, K);
+    const font = (w, px) => c.font = `${w} ${px}px ${SLIP_FONT}`;
+    const fit = (s, max) => { s = String(s ?? ''); if (c.measureText(s).width <= max) return s; while (s && c.measureText(s + '…').width > max) s = s.slice(0, -1); return s + '…'; };
+    const text = (s, x, y, max, color = '#111827') => { c.fillStyle = color; c.fillText(fit(s, max), x, y); };
+    const round = (x, y, w, h, r) => { c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h); };
+    c.fillStyle = '#eef3f8'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#1f4e79'; c.fillRect(0, 0, W, HEAD);
+    c.textBaseline = 'alphabetic';
+    font(700, 24); text(`🗳️ ఓటర్ స్లిప్ · Voter slip${vs.length > 1 ? 's' : ''}`, 20, 36, W - 40, '#fff');
+    font(500, 15); text(SLIP_HEAD, 20, 60, W - 40, '#d6e4f2');
+    if (title) { font(700, 16); text(`👪 ${title} · ${vs.length} voter${vs.length === 1 ? '' : 's'}${part ? ` · ${part}` : ''}`, 20, 84, W - 40, '#fff'); }
+    const photos = await Promise.all(vs.map(v => v.photo ? loadImg('photos/' + v.photo) : null));
+    vs.forEach((v, i) => {
+      const y = HEAD + GAP + i * (CARD + GAP), x = 12, w = W - 24;
+      c.save(); c.shadowColor = 'rgba(0,0,0,.08)'; c.shadowBlur = 6; c.shadowOffsetY = 1;
+      c.fillStyle = '#fff'; round(x, y, w, CARD, 14); c.fill(); c.restore();
+      // photo (cover-fit), or a grey box
+      const px = x + 16, py = y + 16, pw = 96, ph = 118, im = photos[i];
+      c.save(); round(px, py, pw, ph, 10); c.clip(); c.fillStyle = '#e5e7eb'; c.fillRect(px, py, pw, ph);
+      if (im) { const s = Math.max(pw / im.width, ph / im.height), iw = im.width * s, ih = im.height * s; c.drawImage(im, px + (pw - iw) / 2, py + (ph - ih) / 2, iw, ih); }
+      c.restore();
+      const tx = px + pw + 18, tw = x + w - 16 - tx;
+      font(700, 23); text(v.name || v.name_en || '—', tx, y + 44, tw);
+      font(600, 17); text(v.name_en, tx, y + 70, tw, '#374151');
+      font(400, 15); text(`${v.relation}: ${v.relation_name || '—'}`, tx, y + 96, tw, '#4b5563');
+      font(400, 14); text(v.relation_name_en || '', tx, y + 116, tw, '#6b7280');
+      // field boxes along the bottom
+      const fields = [['Ward', v.ward], ['Serial No.', v.serial], ['House No.', v.house_no || '—'], ['EPIC No.', v.epic || '—'], ['Age', v.age || '—']];
+      const fy = y + 146, fh = 54, fx0 = x + 16, fw = w - 32, widths = [0.13, 0.17, 0.22, 0.34, 0.14];
+      let fx = fx0;
+      fields.forEach(([lab, val], j) => {
+        const cw = fw * widths[j] - (j < fields.length - 1 ? 6 : 0);
+        c.fillStyle = j === 1 ? '#e8f0f8' : '#f3f4f6'; round(fx, fy, cw, fh, 8); c.fill();
+        font(600, 11.5); text(lab.toUpperCase(), fx + 9, fy + 18, cw - 14, '#6b7280');
+        font(700, j === 1 ? 21 : 17); text(val, fx + 9, fy + 43, cw - 14, j === 1 ? '#1f4e79' : '#111827');
+        fx += cw + 6;
+      });
+    });
+    font(400, 12); text('Details from the Pedagadi 2026 electoral roll. Carry this slip and your ID to the polling station.', 20, H - 13, W - 40, '#6b7280');
+    return new Promise(res => cv.toBlob(res, 'image/png'));
+  }
+  const slipFileName = (vs, title, part) => (title ? title.replace(/[^\wఀ-౿ -]+/g, '').trim().replace(/\s+/g, '-') + '-voter-slips' : `voter-slip-${vs[0].epic || vs[0].id}`) + (part ? `-${part.replace(/\D+/g, '-').replace(/^-|-$/g, '')}` : '') + '.png';
+  const SLIPS_PER_IMAGE = 12;
+  const famSlipVoters = gid => [...gMembers(gid).keys()].map(id => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
+  // open the slip sheet for one voter or a family; title = family name (or '' for one voter)
+  async function showSlips(vs, title = '') {
+    vs = vs.filter(Boolean); if (!vs.length) { toast('No voters to share'); return; }
+    const token = {}; $('#slipSheet')._token = token;
+    $('#slipTitle').textContent = vs.length > 1 ? 'Voter slips' : 'Voter slip';
+    $('#slipSub').textContent = title ? `${title} · ${vs.length} voter${vs.length === 1 ? '' : 's'}${vs.length > SLIPS_PER_IMAGE ? ` · ${Math.ceil(vs.length / SLIPS_PER_IMAGE)} images` : ''}` : `${vs[0].name_en} · Ward ${vs[0].ward} · Serial ${vs[0].serial}`;
+    const prev = $('#slipPrev'), imgBtn = $('#slipImg');
+    prev.innerHTML = '<p class="hint" style="margin:8px">Making the slip…</p>'; imgBtn.disabled = true;
+    const txt = slipText(vs, title);
+    // WhatsApp text: to anyone, or straight to a saved number of these voters
+    const nums = [...new Map(vs.flatMap(v => phonesOf(v.id).map(p => [p, v]))).entries()].slice(0, 6);
+    $('#slipTo').className = 'slip-to';
+    $('#slipTo').innerHTML = nums.map(([p, v]) => `<button type="button" class="btn wa-out" data-wa-to="${p}">Text to ${esc(fmtPhone(p))}${vs.length > 1 ? ` <small>(${esc(firstName(v))})</small>` : ''}</button>`).join('');
+    $('#slipTo').querySelectorAll('[data-wa-to]').forEach(b => b.onclick = () => window.open(`https://wa.me/91${b.dataset.waTo}?text=${encodeURIComponent(txt)}`, '_blank'));
+    $('#slipTxt').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+    $('#slipClose').onclick = () => closeTop();
+    if (!raise('#slipSheet')) openSheet('#slipSheet');
+    $('#slipSheet .sheet').scrollTop = 0;
+    // build the images now, so the share button works straight away when tapped
+    const parts = [];
+    for (let i = 0; i < vs.length; i += SLIPS_PER_IMAGE) parts.push(vs.slice(i, i + SLIPS_PER_IMAGE));
+    const files = [];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts.length > 1 ? `part ${i + 1} of ${parts.length}` : '';
+      const blob = await slipImage(parts[i], title, part);
+      if ($('#slipSheet')._token !== token) return;  // another slip was opened meanwhile
+      if (!blob) continue;
+      files.push(new File([blob], slipFileName(parts[i], title, part), { type: 'image/png' }));
+    }
+    if (!files.length) { prev.innerHTML = '<p class="hint" style="margin:8px">Could not make the image. Send as text instead.</p>'; return; }
+    (prev._urls || []).forEach(u => URL.revokeObjectURL(u));
+    prev._urls = files.map(f => URL.createObjectURL(f));
+    prev.innerHTML = prev._urls.map(u => `<img src="${u}" alt="Voter slip preview">`).join('');
+    const canFiles = !!(navigator.canShare && navigator.canShare({ files }));
+    imgBtn.disabled = false;
+    imgBtn.querySelector('span').textContent = canFiles ? `Share slip${vs.length > 1 ? 's' : ''} image${files.length > 1 ? 's' : ''}` : `Download slip image${files.length > 1 ? 's' : ''}`;
+    $('#slipHint').textContent = canFiles ? 'Tap the green button, then choose WhatsApp and the person to send it to.'
+      : 'This browser can’t share images directly. Download the image, then attach it in WhatsApp — or send the slip as text.';
+    imgBtn.onclick = async () => {
+      if (canFiles) {
+        try { await navigator.share({ files, title: title ? `${title} – voter slips` : `Voter slip – ${vs[0].name_en}` }); }
+        catch (e) { if (e && e.name !== 'AbortError') toast('Sharing failed. Try “Send as text”.'); }
+        return;
+      }
+      files.forEach((f, i) => { const a = document.createElement('a'); a.href = prev._urls[i]; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
+      toast(files.length > 1 ? 'Images saved. Attach them in WhatsApp.' : 'Image saved. Attach it in WhatsApp.');
+    };
+  }
   // ---------- phone numbers ----------
   function setPhones(id, list) {
     const val = [...new Set(list)].slice(0, 5).join(',');
@@ -562,6 +674,7 @@
     $('#detailSheet')._vid = id;
     const fam = (households.get(v.hkey) || []).filter(x => x.id !== v.id);
     const marked = marks.has(v.id);
+    const myFams = Object.keys(FAM).filter(gid => gType(gid) === 'family' && inGroup(gid, v.id) && gMembers(gid).size > 1);
     $('#detail').innerHTML = `
       <div class="d-top">${photo(v)}
         <div><div class="nm">${esc(v.name || '(name not in list)')}</div><div class="en">${esc(v.name_en)}</div>
@@ -585,10 +698,12 @@
         <button class="btn" id="dCopy">Copy</button>
         <button class="btn" id="dShare">Share</button>
       </div>
+      <button class="btn wa w100 wa-slip" id="dSlip">${WA_ICON}<span>Share voter slip on WhatsApp</span></button>
+      ${myFams.length ? myFams.map(gid => `<button class="btn wa-out w100 wa-slip" data-fam-slip="${gid}">${WA_ICON}<span>Share slips of family “${esc(famName(gid))}” (${gMembers(gid).size})</span></button>`).join('') : ''}
       ${marked ? whoLine('m', v.id) : ''}
       <textarea class="note" id="dNote" placeholder="${cloud.code ? 'Note (synced with your sync code)' : 'Private note (saved on this phone only)'}">${esc(notes[v.id] || '')}</textarea>
       ${notes[v.id] ? whoLine('n', v.id) : ''}
-      ${fam.length ? `<h3 style="font-size:13px;color:var(--muted);margin:16px 0 4px;text-transform:uppercase">Same house (${fam.length})</h3>
+      ${fam.length ? `<h3 style="font-size:13px;color:var(--muted);margin:16px 0 4px;text-transform:uppercase">Same house (${fam.length})<button class="slip-link" id="dHouseSlip">📲 Share all ${fam.length + 1} slips</button></h3>
         <div class="house">${fam.map(x => `<button class="member" data-fam="${x.id}">${photo(x)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(x.name || '—')}</div>${wardPill(x)}</div>
         <div class="en">${esc(x.name_en)} · ${esc(x.relation)}: ${esc(x.relation_name_en || '—')} · #${x.serial}</div></div></button>`).join('')}</div>` : ''}
       <div class="sheet-actions"><button class="btn primary" id="dClose">Close</button></div>`;
@@ -604,6 +719,9 @@
       else { try { await navigator.clipboard.writeText(textOf(v)); toast('Copied (share not supported)'); } catch { } }
     };
     $('#dNote').oninput = e => { const val = e.target.value.trim(); if (val) notes[v.id] = val; else delete notes[v.id]; LS.set('pv_notes', notes); cloud.put('n', v.id, notes[v.id] || null); };
+    $('#dSlip').onclick = () => showSlips([v]);
+    $('#detail').querySelectorAll('[data-fam-slip]').forEach(b => b.onclick = () => showSlips(famSlipVoters(b.dataset.famSlip), famName(b.dataset.famSlip)));
+    if ($('#dHouseSlip')) $('#dHouseSlip').onclick = () => showSlips([v, ...fam].sort((a, b) => a.serial - b.serial), `House ${v.house_no || '—'}, Ward ${v.ward}`);
     $('#dFam').onclick = () => showFamPick(v.id);
     $('#dPhone').onclick = () => showPhones(v.id);
     $('#detail').querySelectorAll('[data-fam-open]').forEach(b => b.onclick = () => showFam(b.dataset.famOpen));
@@ -1133,6 +1251,7 @@
       ${t === 'family' ? (isReviewed(gid)
         ? `<div class="rev-box done"><span>✓ Reviewed${g.r ? ' by ' + esc(g.r) : ''}</span><button class="btn" id="fUnrev">Undo</button>${nextUnreviewed(gid) ? '<button class="btn primary" id="fNext">Next ›</button>' : ''}</div>`
         : `<div class="rev-box"><span>Not reviewed yet. Check the members, add or remove people, then mark it.</span><button class="btn primary" id="fRev">✓ Mark reviewed</button></div>`) : ''}
+      ${t === 'family' && mem.length ? `<button class="btn wa w100 wa-slip" id="fSlip">${WA_ICON}<span>Share ${mem.length === 1 ? 'voter slip' : `all ${mem.length} voter slips`} on WhatsApp</span></button>` : ''}
       <div class="d-actions"><button class="btn" id="fShow">Show in list</button><button class="btn" id="fRename">Rename</button><button class="btn danger" id="fDelete">Delete</button></div>
       <h3>Surnames in this group</h3>
       <div class="fam-dd">${sn.map(k => `<span class="fam-chip sn">${esc(snLabel(k))} <small>${SURNAMES.get(k) ? SURNAMES.get(k).n : ''}</small><button data-sn-rm="${esc(k)}" aria-label="Remove surname">×</button></span>`).join('')}
@@ -1155,6 +1274,7 @@
     box.querySelector('#fClose').onclick = () => closeTop();
     box.querySelector('#fShow').onclick = () => showGroupInList(gid);
     const on = (id, fn) => { const b = box.querySelector(id); if (b) b.onclick = fn; };
+    on('#fSlip', () => showSlips(mem, famName(gid)));
     on('#fRev', () => { setReviewed(gid, true); showFam(gid, true); toast('Family marked reviewed'); });
     on('#fUnrev', () => { setReviewed(gid, false); showFam(gid, true); });
     on('#fNext', () => { const n = nextUnreviewed(gid); if (n) { showFam(n, true); $('#famSheet').scrollTop = 0; } });
