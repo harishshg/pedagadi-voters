@@ -259,14 +259,22 @@
       if (S.marked && S.view !== 'marked') af.push(`<button class="af" data-clear="marked">★ Marked only <b>×</b></button>`);
     }
     if (sn && S.view !== 'surnames') af.push(`<button class="af" data-clear="surname">${esc(sn.te)} · ${esc(sn.en)} <b>×</b></button>`);
-    if (S.caste !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="caste">${esc(S.caste)} <b>×</b></button>`);
+    if (S.caste !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="caste">Category: ${esc(casteLbl(S.caste) === '—' ? 'Not specified' : S.caste)} <b>×</b></button>`);
     if (S.rel !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="rel">${esc(S.rel)} <b>×</b></button>`);
-    $('#activeFilters').innerHTML = af.join('');
+    if (S.sort !== 'serial' && (S.view === 'list' || S.view === 'marked')) af.push(`<button class="af" data-clear="sort">Sorted by ${{ name: 'name', surname: 'surname', house: 'house no.' }[S.sort] || S.sort} <b>×</b></button>`);
+    if (S.ward) af.unshift(`<button class="af" data-clear="ward">Ward ${S.ward} <b>×</b></button>`);
+    if (af.length > 1) af.unshift(`<button class="af clear-all" data-clear="all">Clear all</button>`);
+    $('#activeFilters').innerHTML = af.length ? `<span class="af-lbl">Filters:</span>${af.join('')}` : '';
+    $('#activeFilters').hidden = !af.length;
   }
   $('#activeFilters').onclick = e => {
     const r = e.target.closest('[data-ffrm]'); if (r) { ffToggle(r.dataset.ffrm, false); return; }
     const b = e.target.closest('[data-clear]'); if (!b) return;
-    const k = b.dataset.clear; if (k === 'fgrp') S.fsel = []; S[k] = k === 'marked' ? false : ['surname', 'cgrp', 'fgrp'].includes(k) ? '' : 'all'; update();
+    const k = b.dataset.clear;
+    if (k === 'all') { Object.assign(S, { ward: 0, caste: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false }); update(); return; }
+    if (k === 'ward') { S.ward = 0; update(); return; }
+    if (k === 'sort') { S.sort = 'serial'; update(); return; }
+    if (k === 'fgrp') S.fsel = []; S[k] = k === 'marked' ? false : ['surname', 'cgrp', 'fgrp'].includes(k) ? '' : 'all'; update();
   };
   function update() { saveState(); drawChips(); render(); window.scrollTo({ top: 0 }); if (selecting) drawSelBar(); }
   const setView = v => { if (selecting) leaveSelect(); S.view = v; update(); };

@@ -382,3 +382,12 @@ body.has-selbar main{padding-bottom:80px}
 .ff-foot{flex:none;padding:10px 0 calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
 .ff-sel{margin-top:6px}
 .ff-sel .chip b{margin-left:4px}
+
+/* filters in use, always visible in the sticky header */
+.top .active-filters{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px -16px 0;padding:0 16px 2px}
+.top .active-filters[hidden]{display:none}
+.top .active-filters::-webkit-scrollbar{display:none}
+.af-lbl{flex:none;font-size:12px;font-weight:600;opacity:.8}
+.top .af{flex:none;white-space:nowrap;border-color:rgba(255,255,255,.55);background:rgba(255,255,255,.16);color:#fff;cursor:pointer}
+.top .af b{color:#fff;opacity:.85}
+.top .af.clear-all{background:#fff;color:var(--brand);border-color:#fff;padding:3px 10px}
