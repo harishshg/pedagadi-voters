@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=39">
+<link rel="stylesheet" href="style.css?v=40">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -119,6 +119,22 @@
   </div>
 </div>
 
+<!-- Name a new family / caste, or rename one -->
+<div class="sheet-backdrop" id="nameSheet" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="nmTitle">
+    <div class="grab"></div>
+    <form id="nmForm" autocomplete="off">
+      <h2 id="nmTitle"></h2>
+      <p class="fam-sub" id="nmSub"></p>
+      <label class="nm-label" for="nmInput" id="nmLabel">Name</label>
+      <div class="nm-field"><input id="nmInput" maxlength="40" enterkeyhint="done"><span id="nmCount"></span></div>
+      <p class="nm-warn" id="nmWarn" hidden></p>
+      <div id="nmSugg"></div>
+      <div class="sheet-actions"><button type="button" class="btn" id="nmCancel">Cancel</button><button type="submit" class="btn primary" id="nmOk"></button></div>
+    </form>
+  </div>
+</div>
+
 <!-- Detail sheet -->
 <div class="sheet-backdrop" id="detailSheet" hidden>
   <div class="sheet tall" role="dialog" aria-label="Voter details">
@@ -202,7 +218,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=39"></script>
-<script src="app.js?v=39"></script>
+<script src="data.js?v=40"></script>
+<script src="app.js?v=40"></script>
 </body>
 </html>

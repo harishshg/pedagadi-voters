@@ -397,3 +397,13 @@ body.has-selbar main{padding-bottom:80px}
 /* no image preview or text pop-up on long-press, so the long-press starts selecting */
 .list img{-webkit-touch-callout:none;-webkit-user-drag:none}
 .list [data-id],.list [data-sn]{-webkit-touch-callout:none}
+
+/* name sheet for new / renamed families and castes */
+#nameSheet .sheet{padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+.nm-label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 0 6px}
+.nm-field{display:flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:12px;padding:0 12px;background:var(--card)}
+.nm-field:focus-within{border-color:var(--brand)}
+.nm-field input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:17px;height:48px}
+.nm-field span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.nm-warn{margin:8px 0 0;font-size:13px;color:#b45309}
+.btn:disabled{opacity:.45}

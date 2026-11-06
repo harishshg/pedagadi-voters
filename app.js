@@ -327,6 +327,7 @@
   function hideTop() {
     const el = open.pop(); if (!el) return;
     el.hidden = true;
+    if (el._onClose) { const f = el._onClose; el._onClose = null; f(); }
     if (!open.length) document.body.style.overflow = '';
   }
   function closeTop(n = 1) {
@@ -666,11 +667,56 @@
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
-  function bulkNew(t) {
-    const ids = [...sel];
-    const name = prompt(`Name of the new ${GT[t].label.toLowerCase()} group for these ${ids.length} voters (e.g. ${GT[t].eg}):`, '');
-    if (!name || !name.trim()) return;
-    const gid = famNew(name.trim().slice(0, 40), t);
+  // ---------- naming a family or caste (an in-app sheet instead of the browser's prompt box) ----------
+  // resolves with the name, or null if the sheet was closed; waits for the sheet's history entry to go first
+  function askName({ title, sub = '', label = 'Name', value = '', ok = 'Create', t = 'family', except = '', sugg = [], hint = '' }) {
+    return new Promise(resolve => {
+      const sh = $('#nameSheet'), inp = $('#nmInput');
+      $('#nmTitle').textContent = title; $('#nmSub').innerHTML = sub; $('#nmSub').hidden = !sub;
+      $('#nmLabel').textContent = label; $('#nmOk').textContent = ok;
+      inp.value = value; inp.placeholder = `e.g. ${GT[t].eg}`;
+      const taken = new Map(Object.keys(FAM).filter(gid => gid !== except && gType(gid) === t).map(gid => [famName(gid).toLowerCase(), gid]));
+      const list = [...new Set(sugg.filter(x => x && (!taken.has(x.toLowerCase()) || x === value)))].slice(0, 6);   // names already used are left out
+      $('#nmSugg').innerHTML = (list.length ? `<div class="nm-label">Suggestions</div><div class="chips wrap">${list.map(x => `<button type="button" class="chip" data-nm="${esc(x)}">${esc(x)}</button>`).join('')}</div>` : '') +
+        (hint ? `<p class="hint">${hint}</p>` : '');
+      const check = () => {
+        const v = inp.value.trim(), dup = v && taken.get(v.toLowerCase());
+        $('#nmCount').textContent = `${inp.value.length}/40`;
+        $('#nmWarn').hidden = !dup; if (dup) $('#nmWarn').textContent = `A ${GT[t].label.toLowerCase()} called “${famName(dup)}” already exists. Pick a different name so you can tell them apart.`;
+        $('#nmOk').disabled = !v || !!dup || (except && v === famName(except));
+        $('#nmSugg').querySelectorAll('[data-nm]').forEach(b => b.classList.toggle('on', b.dataset.nm === v));
+      };
+      inp.oninput = check;
+      $('#nmSugg').onclick = e => { const b = e.target.closest('[data-nm]'); if (b) { inp.value = b.dataset.nm; check(); inp.focus(); } };
+      let done = false;
+      const finish = v => { if (done) return; done = true; resolve(v); };
+      sh._onClose = () => finish(null);
+      $('#nmCancel').onclick = () => closeTop();
+      $('#nmForm').onsubmit = e => {
+        e.preventDefault(); if ($('#nmOk').disabled) return;
+        const v = inp.value.trim().slice(0, 40);
+        sh._onClose = null;
+        const after = () => { removeEventListener('popstate', after); clearTimeout(tm); finish(v); };
+        const tm = setTimeout(after, 500); addEventListener('popstate', after);
+        closeTop();
+      };
+      check(); openSheet('#nameSheet');
+      setTimeout(() => { inp.focus(); inp.select(); }, 120);
+    });
+  }
+  // name ideas for a family made from these voters: their surname, then surname + the eldest member's name
+  function famSuggestions(vs) {
+    vs = vs.filter(Boolean); if (!vs.length) return [];
+    const c = new Map(); vs.forEach(v => { const k = v.surname_en; if (k) c.set(k, (c.get(k) || 0) + 1); });
+    const sns = [...c.keys()].sort((a, b) => c.get(b) - c.get(a)), old = eldestOf(vs);
+    return sns.length ? [sns[0], `${sns[0]} (${firstName(old)})`, `${sns[0]} family`, ...sns.slice(1, 3)] : [`House ${old.house_no}`];
+  }
+  const pickFree = (list, t) => { const taken = new Set(Object.keys(FAM).filter(g => gType(g) === t).map(g => famName(g).toLowerCase())); return list.find(n => !taken.has(n.toLowerCase())) || ''; };
+  async function bulkNew(t) {
+    const ids = [...sel], vs = ids.map(id => byId.get(id)), sg = t === 'family' ? famSuggestions(vs) : [];
+    const name = await askName({ title: `New ${GT[t].label.toLowerCase()}`, sub: `With the ${ids.length} selected voter${ids.length === 1 ? '' : 's'}`, t, sugg: sg, value: pickFree(sg, t) });
+    if (!name) return;
+    const gid = famNew(name, t);
     gAddMany(gid, ids);
     toast(`Made ${famName(gid)} with ${ids.length} voters`); leaveSelect();
   }
@@ -789,9 +835,9 @@
     const box = $('#famPick');
     box.querySelector('#fpClose').onclick = () => closeTop();
     box.querySelector('#snSee').onclick = () => { S.surname = sk; S.view = 'list'; S.ward = 0; q.value = ''; S.q = ''; $('#clearQ').hidden = true; closeTop(open.length); update(); };
-    box.querySelector('#snNewC').onclick = () => {
-      const name = prompt('Name of the caste group (e.g. Kapu, Yadava, Velama):', ''); if (!name || !name.trim()) return;
-      const gid = famNew(name.trim().slice(0, 40), 'caste'), moved = setCaste(sk, gid); famChanged(); toast(moved.length ? `${sn.en} moved from ${moved.join(', ')} to ${famName(gid)}` : `${sn.en} → ${famName(gid)}`); showSurname(sk, true);
+    box.querySelector('#snNewC').onclick = async () => {
+      const name = await askName({ title: 'New caste', sub: `Everyone with the surname <b>${esc(sn.en)}</b> (${sn.n}) will be in it.`, t: 'caste' }); if (!name) return;
+      const gid = famNew(name, 'caste'), moved = setCaste(sk, gid); famChanged(); toast(moved.length ? `${sn.en} moved from ${moved.join(', ')} to ${famName(gid)}` : `${sn.en} → ${famName(gid)}`); showSurname(sk, true);
     };
     box.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => {
       const gid = b.dataset.sc;
@@ -818,9 +864,9 @@
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
     box.querySelector('#fpClose').onclick = () => closeTop();
-    box.querySelector('#bsNew').onclick = () => {
-      const name = prompt(`Name of the caste group for these ${n} surnames (e.g. Kapu, Yadava):`, ''); if (!name || !name.trim()) return;
-      const gid = famNew(name.trim().slice(0, 40), 'caste'); ks.forEach(k => setCaste(k, gid)); famChanged();
+    box.querySelector('#bsNew').onclick = async () => {
+      const name = await askName({ title: 'New caste', sub: `With the ${n} selected surname${n === 1 ? '' : 's'}`, t: 'caste' }); if (!name) return;
+      const gid = famNew(name, 'caste'); ks.forEach(k => setCaste(k, gid)); famChanged();
       toast(`${famName(gid)}: ${n} surnames`); leaveSelect();
     };
     box.querySelector('#bsNone').onclick = () => { ks.forEach(k => setCaste(k, '')); famChanged(); toast(`${n} surnames taken out of castes`); leaveSelect(); };
@@ -832,12 +878,15 @@
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
-  function famCreate(t, firstVoter) {
+  async function famCreate(t, firstVoter) {
     const v = firstVoter && byId.get(firstVoter);
-    const def = t === 'family' && v ? `${v.surname_en || v.name_en.split(' ').pop()} family` : '';
-    const name = prompt(`Name of the ${GT[t].label.toLowerCase()} group (e.g. ${GT[t].eg}):`, def);
-    if (!name || !name.trim()) return null;
-    const gid = famNew(name.trim().slice(0, 40), t);
+    // a family for one voter: suggest names from them and the people in their house
+    const sg = t === 'family' && v ? famSuggestions([v, ...(households.get(v.hkey) || []).filter(y => y.surname === v.surname)]) : [];
+    const name = await askName({ title: `New ${GT[t].label.toLowerCase()}`, t, sugg: sg, value: pickFree(sg, t),
+      sub: v ? `Starting with <b>${esc(v.name_en || v.name)}</b>` : '',
+      hint: t === 'family' ? 'After creating it, add people from the suggestions or by selecting them in the list.' : 'After creating it, add surnames to it from the Surnames tab.' });
+    if (!name) return null;
+    const gid = famNew(name, t);
     if (v) gAddVoter(gid, v.id);
     showFam(gid);
     return gid;
@@ -1026,9 +1075,11 @@
     on('#fUnrev', () => { setReviewed(gid, false); showFam(gid, true); });
     on('#fNext', () => { const n = nextUnreviewed(gid); if (n) { showFam(n, true); $('#famSheet').scrollTop = 0; } });
     if (box.querySelector('#fShow2')) box.querySelector('#fShow2').onclick = () => showGroupInList(gid);
-    box.querySelector('#fRename').onclick = () => {
-      const n = prompt('New name for this group:', g.name); if (!n || !n.trim()) return;
-      g.name = n.trim().slice(0, 40); cloud.put('G', gid, g.name); famChanged(); showFam(gid, true);
+    box.querySelector('#fRename').onclick = async () => {
+      const n = await askName({ title: `Rename ${GT[t].label.toLowerCase()}`, value: g.name, ok: 'Save', t, except: gid,
+        sugg: t === 'family' ? famSuggestions([...gMembers(gid).keys()].map(id => byId.get(id))) : [] });
+      if (!n || !FAM[gid]) return;
+      g.name = n; cloud.put('G', gid, g.name); famChanged(); showFam(gid, true);
     };
     box.querySelector('#fDelete').onclick = () => {
       if (!confirm(`Delete the group "${famName(gid)}"? The voters are not deleted.`)) return;
@@ -1060,8 +1111,9 @@
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
     box.querySelector('#fpClose').onclick = () => closeTop();
-    box.querySelector('#fpNewF').onclick = () => { closeTop(); setTimeout(() => famCreate('family', vid), 60); };
-    box.querySelector('#fpNewC').onclick = () => { closeTop(); setTimeout(() => famCreate('caste', vid), 60); };
+    // the name sheet opens on top; the new group then opens over this list, and Back comes back to it
+    box.querySelector('#fpNewF').onclick = () => famCreate('family', vid);
+    box.querySelector('#fpNewC').onclick = () => famCreate('caste', vid);
     box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
       const gid = b.dataset.g, on = !inGroup(gid, vid);
       if (on) toast(addedMsg(gid, gAddVoter(gid, vid))); else { gRemoveVoter(gid, vid); toast(`Removed from ${famName(gid)}`); }
