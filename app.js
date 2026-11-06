@@ -718,14 +718,34 @@
     box.querySelector('#fpClose').onclick = () => closeTop();
     box.querySelector('#bpNewF').onclick = () => bulkNew('family');
     box.querySelector('#bpNewC').onclick = () => bulkNew('caste');
-    box.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => {
+    box.querySelectorAll('[data-bg]').forEach(b => b.onclick = async () => {
       const gid = b.dataset.bg, all = ids.every(id => inGroup(gid, id));
-      if (all) { if (!confirm(`Remove these ${n} from ${famName(gid)}?`)) return; gRemoveMany(gid, ids); toast(`Removed ${n} from ${famName(gid)}`); showBulkPick(true); return; }
+      if (all) { if (!await askSure({ title: `Remove from ${famName(gid)}?`, body: `<p>Take the ${n} selected voter${n === 1 ? '' : 's'} out of <b>${esc(famName(gid))}</b>. The voters themselves are not deleted.</p>`, ok: 'Remove', danger: true })) return; gRemoveMany(gid, ids); toast(`Removed ${n} from ${famName(gid)}`); showBulkPick(true); return; }
       const added = gAddMany(gid, ids);
       toast(`Added ${added} to ${famName(gid)}${lastMoved ? ` (${lastMoved} moved from another family)` : ''}`); leaveSelect();
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
+  // ---------- "are you sure?" in an in-app sheet; resolves true / false, after the sheet's history entry is gone ----------
+  function askSure({ title, body = '', ok = 'OK', cancel = 'Cancel', danger = false }) {
+    return new Promise(resolve => {
+      const sh = $('#askSheet'), yes = $('#askYes');
+      $('#askTitle').textContent = title; $('#askBody').innerHTML = body; $('#askBody').hidden = !body;
+      yes.textContent = ok; $('#askNo').textContent = cancel;
+      yes.classList.toggle('primary', !danger); yes.classList.toggle('danger-fill', danger);
+      let done = false; const finish = v => { if (!done) { done = true; resolve(v); } };
+      sh._onClose = () => finish(false);
+      $('#askNo').onclick = () => closeTop();
+      yes.onclick = () => {
+        sh._onClose = null;
+        const after = () => { removeEventListener('popstate', after); clearTimeout(tm); finish(true); };
+        const tm = setTimeout(after, 500); addEventListener('popstate', after);
+        closeTop();
+      };
+      openSheet('#askSheet'); setTimeout(() => yes.focus(), 120);
+    });
+  }
+
   // ---------- naming a family or caste (an in-app sheet instead of the browser's prompt box) ----------
   // resolves with the name, or null if the sheet was closed; waits for the sheet's history entry to go first
   // t = 'family' / 'caste' checks for names already used; t = null for other names (device, sync list)
@@ -985,11 +1005,14 @@
     while (taken.has(name.toLowerCase())) name = `${tries[tries.length - 1]} ${i++}`;
     name = name.slice(0, 40); taken.add(name.toLowerCase()); return name;
   }
-  function autoFamilies() {
+  async function autoFamilies() {
     const plan = autoFamPlan();
     if (!plan.length) { toast('Every house with 3 or more voters already has a family'); return; }
     const n = plan.reduce((a, p) => a + p.vs.length, 0);
-    if (!confirm(`Make ${plan.length} families from houses with 3 or more voters (${n.toLocaleString()} voters)?\n\nEach is named after the house's surname. If that name is already used, the eldest member's name is added. You can rename any family later.${cloud.code ? '\n\nEveryone using your sync code will see them.' : ''}`)) return;
+    if (!await askSure({ title: `Make ${plan.length} families?`, ok: `Make ${plan.length} families`,
+      body: `<p>One family for each house with 3 or more voters who are not in a family yet: <b>${n.toLocaleString()} voters</b>.</p>
+        <ul><li>Each is named after the house's surname.</li><li>If that name is already used, the eldest member's name is added, e.g. “Gotivada (Polamma)”.</li><li>You can rename, edit or delete any of them later.</li></ul>
+        ${cloud.code ? '<p>Everyone using your sync code will see them.</p>' : ''}` })) return;
     const taken = new Set(Object.keys(FAM).filter(gid => gType(gid) === 'family').map(gid => famName(gid).toLowerCase()));
     cloud.many(() => plan.forEach(p => {
       const name = autoFamName(p.vs, taken);
@@ -1142,8 +1165,10 @@
       if (!n || !FAM[gid]) return;
       g.name = n; cloud.put('G', gid, g.name); famChanged(); showFam(gid, true);
     };
-    box.querySelector('#fDelete').onclick = () => {
-      if (!confirm(`Delete the group "${famName(gid)}"? The voters are not deleted.`)) return;
+    box.querySelector('#fDelete').onclick = async () => {
+      const nm = gMembers(gid).size;
+      if (!await askSure({ title: `Delete “${famName(gid)}”?`, ok: 'Delete', danger: true,
+        body: `<p>This ${GT[t].label.toLowerCase()} and its list of ${nm} voter${nm === 1 ? '' : 's'} are removed${cloud.code ? ' for everyone using your sync code' : ''}. The voters themselves are not deleted.</p>` }) || !FAM[gid]) return;
       delete FAM[gid]; cloud.put('G', gid, null); if (S.cgrp === gid) S.cgrp = ''; S.fsel = S.fsel.filter(x => x !== gid); if (S.fgrp === 'sel' && !S.fsel.length) S.fgrp = ''; famChanged(); closeTop(); toast('Group deleted');
     };
     box.querySelector('#fAddSn').onclick = () => openSurnamePicker(gid);
@@ -1574,7 +1599,8 @@
       <p class="hint">Opening a recent code replaces the marks and notes on this device with that code's saved copy.</p>` : '';
     const bindRecent = () => box.querySelectorAll('.rc-open').forEach(b => b.onclick = async () => {
       const c = b.dataset.code, label = cloud.nameOf(c) ? `"${cloud.nameOf(c)}" (${c})` : c;
-      if (!confirm(`Open ${label}?\nMarks and notes on this device will be replaced by the ones saved under this code.`)) return;
+      if (!await askSure({ title: `Open ${cloud.nameOf(c) || c}?`, ok: 'Open',
+        body: `<p>Marks, notes and phone numbers on this device will be replaced by the ones saved under <b>${esc(c)}</b>.</p>` })) return;
       b.disabled = true;
       if (await cloud.switchTo(c)) toast(`Switched to ${cloud.nameOf(c) || c} · ${marks.size} marked`);
       drawSync();
@@ -1646,7 +1672,11 @@
       if (navigator.share) { try { await navigator.share({ title: 'Sync code', text, url: syncLink() }); } catch { } }
       else { try { await navigator.clipboard.writeText(text + ' ' + syncLink()); toast('Copied'); } catch { } }
     };
-    $('#syOff').onclick = () => { if (confirm('Stop syncing on this device? Your marks stay on this device and in the cloud.')) { cloud.leave(); drawSync(); toast('Sync turned off'); } };
+    $('#syOff').onclick = async () => {
+      if (!await askSure({ title: 'Stop syncing on this device?', ok: 'Stop syncing', danger: true,
+        body: '<p>Your marks, notes and numbers stay on this device and in the cloud. Changes made here will no longer reach other devices. You can join the code again later.</p>' })) return;
+      cloud.leave(); drawSync(); toast('Sync turned off');
+    };
   }
   $('#syncBtn').onclick = () => { drawSync(); openSheet('#syncSheet'); if (cloud.code) cloud.sync(); };
   $('#syClose').onclick = () => closeTop();
@@ -1654,9 +1684,10 @@
   const hashCode = cleanCode((location.hash.match(/sync=([^&]+)/) || [])[1]);
   if (hashCode) {
     history.replaceState(null, '', location.pathname + location.search);
-    if (hashCode !== cloud.code && cloud.ready && validCode(hashCode) &&
-        confirm(`Sync marks with code ${hashCode}?${cloud.code ? '\nThis replaces your current code ' + cloud.code + '.' : ''}`))
-      askDevName().then(() => cloud.join(hashCode)).then(() => toast(cloud.err ? 'Will sync when online' : 'Joined. Marks synced'));
+    if (hashCode !== cloud.code && cloud.ready && validCode(hashCode))
+      askSure({ title: 'Join this sync code?', ok: 'Join', cancel: 'Not now',
+        body: `<p>Sync marks, notes and phone numbers with <b>${esc(hashCode)}</b>.${cloud.code ? ` This replaces your current code <b>${esc(cloud.code)}</b>.` : ''}</p>` })
+        .then(ok => ok && askDevName().then(() => cloud.join(hashCode)).then(() => toast(cloud.err ? 'Will sync when online' : 'Joined. Marks synced')));
   }
   drawSyncDot();
   cloud.sync();

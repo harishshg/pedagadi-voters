@@ -425,3 +425,10 @@ body.has-selbar main{padding-bottom:80px}
 .ph-btns{display:flex;gap:8px;margin-left:auto}
 .ph-btns .btn{flex:none;padding:7px 14px;font-size:14px}
 .ph-btns .btn.danger{margin-top:0;background:#dc2626;color:#fff;border-color:#dc2626}
+
+/* "are you sure?" sheet */
+.ask-body{font-size:15px;color:var(--ink)}
+.ask-body p{margin:8px 0}
+.ask-body ul{margin:8px 0;padding-left:20px;color:var(--muted);font-size:14px}
+.ask-body li{margin:4px 0}
+.btn.danger-fill{background:#dc2626;border-color:#dc2626;color:#fff}
