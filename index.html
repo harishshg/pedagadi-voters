@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=49">
+<link rel="stylesheet" href="style.css?v=50">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -79,6 +79,8 @@
       <div class="chips wrap" id="casteChips"></div>
       <h3>Phone number</h3>
       <div class="chips wrap" id="phoneChips"></div>
+      <h3>Status</h3>
+      <div class="chips wrap" id="statusChips"></div>
       <div id="fsSort"><h3>Sort by</h3><div class="chips wrap" id="sortChips"></div></div>
     </div>
     <div class="sheet-actions">
@@ -181,6 +183,20 @@
   </div>
 </div>
 
+<!-- Mark as duplicate: choose the other entry of the same person -->
+<div class="sheet-backdrop" id="dupSheet" hidden>
+  <div class="sheet tall" role="dialog" aria-labelledby="dpTitle">
+    <div class="grab"></div>
+    <h2 id="dpTitle">Mark as duplicate</h2>
+    <p class="fam-sub" id="dpWho"></p>
+    <p class="hint" style="margin-top:6px">Which entry is the same person? Tap it. This entry gets the ⧉ Duplicate tag; the one you tap stays as it is.</p>
+    <input id="dpQ" class="dp-q" type="search" placeholder="Search name, serial no., EPIC…" autocomplete="off">
+    <h3 id="dpHead"></h3>
+    <div id="dpList"></div>
+    <div class="sheet-actions"><button type="button" class="btn" id="dpCancel">Cancel</button><button type="button" class="btn primary" id="dpNone">Mark without choosing</button></div>
+  </div>
+</div>
+
 <!-- Detail sheet -->
 <div class="sheet-backdrop" id="detailSheet" hidden>
   <div class="sheet tall" role="dialog" aria-label="Voter details">
@@ -264,7 +280,7 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script src="data.js?v=49"></script>
-<script src="app.js?v=49"></script>
+<script src="data.js?v=50"></script>
+<script src="app.js?v=50"></script>
 </body>
 </html>

@@ -445,3 +445,12 @@ body.has-selbar main{padding-bottom:80px}
 .slip-link{float:right;text-transform:none;cursor:pointer;border:0;background:none;color:var(--brand);font-weight:700;font-size:12.5px;padding:0 0 0 8px}
 .btn.wa{background:#25d366;border-color:#25d366;color:#fff}
 .btn.wa-out{border-color:#25d366;color:#128c4b}
+/* dead / duplicate */
+.card.gone,.member.gone{opacity:.6}
+.card.gone .nm,.member.gone .nm{text-decoration:line-through;text-decoration-thickness:1px}
+.tag.st-dead{background:#4b5563;color:#fff}
+.tag.st-dup{background:#b45309;color:#fff}
+.st-dd{align-items:center}
+.st-dd .tag{margin-right:4px}
+.st-dd small{display:block;width:100%}
+.dp-q{width:100%;margin-top:12px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:15px}

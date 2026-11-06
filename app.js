@@ -44,6 +44,10 @@
   // so they sync with the sync code like notes do and need no change to the Firestore rules
   const telKey = id => 't:' + id;
   const phonesOf = id => (notes[telKey(id)] || '').split(',').filter(Boolean);
+  // dead / duplicate also travel with the notes, under "s:<voter id>": 'dead', 'dup' or 'dup:<id of the other entry>'
+  const stKey = id => 's:' + id;
+  const statusOf = id => { const r = notes[stKey(id)]; if (!r) return null; const [k, of] = r.split(':'); return k === 'dead' || k === 'dup' ? { k, of: of && of !== id ? of : '' } : null; };
+  const isGone = id => !!statusOf(id);
   const fmtPhone = p => p.length === 10 ? p.slice(0, 5) + ' ' + p.slice(5) : p;
   // "+91 98765-43210", "098765 43210" → "9876543210"; '' if it is not a 10-digit Indian number
   const normPhone = s => { let d = String(s || '').replace(/\D/g, ''); if (d.length === 12 && d.startsWith('91')) d = d.slice(2); else if (d.length === 11 && d[0] === '0') d = d.slice(1); return /^[6-9]\d{9}$/.test(d) ? d : ''; };
@@ -52,7 +56,7 @@
   Object.values(FAM).forEach(g => { g.t = g.t || 'family'; g.v = g.v || {}; g.s = g.s || {}; g.x = g.x || {}; });
   const saveFam = () => LS.set('pv_fam', FAM);
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false, frev: 'all', fsel: [], phone: 'all' }, saved, { q: '' });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false, frev: 'all', fsel: [], phone: 'all', vst: 'all' }, saved, { q: '' });
   if (S.view === 'family' && S.gtype === 'caste') S.view = 'caste';  // the old combined Groups tab
   if (saved.group) { if (((LS.get('pv_fam', {})[saved.group]) || {}).t === 'caste') S.cgrp = saved.group; else S.fgrp = saved.group; }
   // the Family filter: '' any, 'none' not in a family, 'sel' = one of the families in S.fsel (an old single family id becomes a selection)
@@ -86,6 +90,7 @@
     if (S.rel !== 'all') list = list.filter(v => v.relation === S.rel);
     if (S.surname) list = list.filter(v => v.surname === S.surname);
     if (S.phone !== 'all') list = list.filter(v => !!notes[telKey(v.id)] === (S.phone === 'has'));
+    if (S.vst !== 'all') list = list.filter(v => { const st = statusOf(v.id); return S.vst === 'ok' ? !st : S.vst === 'gone' ? !!st : !!st && st.k === S.vst; });
     if (S.marked && S.view !== 'marked') list = list.filter(v => marks.has(v.id));
     // caste group / family: a group id, or 'none' = not in any group of that kind
     if (S.fgrp === 'sel') { S.fsel = S.fsel.filter(gid => FAM[gid]); if (!S.fsel.length) S.fgrp = ''; }
@@ -137,24 +142,26 @@
   }
 
   function cardHTML(v) {
-    return `<button class="card" data-id="${v.id}">
+    const st = statusOf(v.id);
+    return `<button class="card${st ? ' gone' : ''}" data-id="${v.id}">
       ${photo(v)}
       <div class="body">
         <div class="nm-row"><div class="nm">${hl(v.name || '(name not in list)', S.q)}</div>${wardPill(v)}</div>
         <div class="en">${esc(v.name_en)}</div>
         <div class="rel">${esc(v.relation)}: ${hl(v.relation_name || '—', S.nameOnly ? '' : S.q)}</div>
         <div class="meta"><span>House <b>${esc(v.house_no || '—')}</b></span>
-          <span class="tag ${casteCls(v.caste)}">${casteLbl(v.caste)}</span>${notes[telKey(v.id)] ? `<span class="has-ph" title="Has a phone number">📞 ${phonesOf(v.id).length > 1 ? phonesOf(v.id).length : ''}</span>` : ''}</div>
+          <span class="tag ${casteCls(v.caste)}">${casteLbl(v.caste)}</span>${notes[telKey(v.id)] ? `<span class="has-ph" title="Has a phone number">📞 ${phonesOf(v.id).length > 1 ? phonesOf(v.id).length : ''}</span>` : ''}${stTag(v.id)}</div>
       </div>
       <span class="sn">#${v.serial}</span>
       ${marks.has(v.id) ? '<span class="markdot" title="Marked"></span>' : ''}
     </button>`;
   }
 
+  const stTag = id => { const st = statusOf(id); return st ? `<span class="tag st-${st.k}">${st.k === 'dead' ? '✝ Dead' : '⧉ Duplicate'}</span>` : ''; };
   function houseHTML(g) {
     const [w, h] = g.key.split('|');
     return `<div class="house"><div class="house-h" data-hk="${esc(g.key)}"><span>Ward ${w} · House ${esc(h)}</span><small>${g.items.length} voter${g.items.length > 1 ? 's' : ''}</small></div>
-      ${g.items.map(v => `<button class="member" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag star" style="background:var(--mark)">★</span>' : ''}</div>
+      ${g.items.map(v => `<button class="member${isGone(v.id) ? ' gone' : ''}" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag star" style="background:var(--mark)">★</span>' : ''}${stTag(v.id)}</div>
       <div class="en">${esc(v.name_en)} · ${esc(v.relation)}: ${esc(v.relation_name_en || '—')} · #${v.serial}</div></div></button>`).join('')}</div>`;
   }
 
@@ -242,6 +249,7 @@
     const wards = [[0, 'All wards']].concat([...Array(10)].map((_, i) => [i + 1, `Ward ${i + 1}`]));
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
+    chips($('#statusChips'), [['all', 'Any'], ['ok', 'Active only'], ['dead', '✝ Dead'], ['dup', '⧉ Duplicate'], ['gone', 'Dead or duplicate']], S.vst, v => { S.vst = v; update(); });
     chips($('#phoneChips'), [['all', 'Any'], ['has', '📞 Has a number'], ['none', 'No number']], S.phone, v => { S.phone = v; update(); });
     chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
     document.querySelectorAll('#viewSeg button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view));
@@ -250,7 +258,7 @@
     mb.classList.toggle('on', inMore);
     mb.firstChild.textContent = S.view === 'house' ? 'Houses' : S.view === 'marked' ? 'Marked' : 'More';
     const fc = S.view === 'surnames' ? (S.snf !== 'all') + (S.snsort !== 'count')
-      : (S.caste !== 'all') + (S.phone !== 'all') + (S.rel !== 'all') + !!S.surname + !!(S.cgrp && S.view !== 'caste') + !!(S.fgrp && S.view !== 'family') + (S.marked && S.view !== 'marked');
+      : (S.caste !== 'all') + (S.phone !== 'all') + (S.vst !== 'all') + (S.rel !== 'all') + !!S.surname + !!(S.cgrp && S.view !== 'caste') + !!(S.fgrp && S.view !== 'family') + (S.marked && S.view !== 'marked');
     $('#filterCount').textContent = fc ? fc : '';
     // surname dropdown + active filter chips
     const sn = S.surname && SURNAMES.get(S.surname);
@@ -270,6 +278,7 @@
     if (sn && S.view !== 'surnames') af.push(`<button class="af" data-clear="surname">${esc(sn.te)} · ${esc(sn.en)} <b>×</b></button>`);
     if (S.caste !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="caste">Category: ${esc(casteLbl(S.caste) === '—' ? 'Not specified' : S.caste)} <b>×</b></button>`);
     if (S.phone !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="phone">${S.phone === 'has' ? '📞 Has a number' : 'No phone number'} <b>×</b></button>`);
+    if (S.vst !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="vst">${{ ok: 'Active only', dead: '✝ Dead', dup: '⧉ Duplicate', gone: 'Dead or duplicate' }[S.vst]} <b>×</b></button>`);
     if (S.rel !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="rel">${esc(S.rel)} <b>×</b></button>`);
     if (S.sort !== 'serial' && (S.view === 'list' || S.view === 'marked')) af.push(`<button class="af" data-clear="sort">Sorted by ${{ name: 'name', surname: 'surname', house: 'house no.' }[S.sort] || S.sort} <b>×</b></button>`);
     if (S.ward) af.unshift(`<button class="af" data-clear="ward">Ward ${S.ward} <b>×</b></button>`);
@@ -281,7 +290,7 @@
     const r = e.target.closest('[data-ffrm]'); if (r) { ffToggle(r.dataset.ffrm, false); return; }
     const b = e.target.closest('[data-clear]'); if (!b) return;
     const k = b.dataset.clear;
-    if (k === 'all') { Object.assign(S, { ward: 0, phone: 'all', caste: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false }); update(); return; }
+    if (k === 'all') { Object.assign(S, { ward: 0, phone: 'all', vst: 'all', caste: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false }); update(); return; }
     if (k === 'ward') { S.ward = 0; update(); return; }
     if (k === 'sort') { S.sort = 'serial'; update(); return; }
     if (k === 'fgrp') S.fsel = []; S[k] = k === 'marked' ? false : ['surname', 'cgrp', 'fgrp'].includes(k) ? '' : 'all'; update();
@@ -385,7 +394,7 @@
   $('#closeFilters').onclick = () => closeTop();
   $('#resetFilters').onclick = () => {
     if (S.view === 'surnames') { S.snf = 'all'; S.snsort = 'count'; }
-    else Object.assign(S, { caste: 'all', phone: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'name' });
+    else Object.assign(S, { caste: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'name' });
     update();
   };
   // the sheet only shows what makes sense on the open tab
@@ -505,7 +514,7 @@
   function whoLine(t, id) {
     const w = cloud.code && cloud.who[t + ':' + id]; if (!w || !w.by) return '';
     const by = w.d === cloud.dev ? 'you (this device)' : w.by;
-    return `<p class="who">${t === 'm' ? '★ Marked' : id.startsWith('t:') ? '📞 Number saved' : '✎ Note'} by <b>${esc(by)}</b>${w.t ? ' · ' + ago(w.t) : ''}</p>`;
+    return `<p class="who">${t === 'm' ? '★ Marked' : id.startsWith('t:') ? '📞 Number saved' : id.startsWith('s:') ? (statusOf(id.slice(2)) || {}).k === 'dead' ? '✝ Marked dead' : '⧉ Marked duplicate' : '✎ Note'} by <b>${esc(by)}</b>${w.t ? ' · ' + ago(w.t) : ''}</p>`;
   }
   function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => el.hidden = true, 1800); }
   function textOf(v) {
@@ -605,10 +614,15 @@
   const famSlipVoters = gid => [...gMembers(gid).keys()].map(id => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
   // open the slip sheet for one voter or a family; title = family name (or '' for one voter)
   async function showSlips(vs, title = '') {
-    vs = vs.filter(Boolean); if (!vs.length) { toast('No voters to share'); return; }
+    vs = vs.filter(Boolean);
+    // family / house slips leave out voters marked dead or duplicate
+    const left = vs.length > 1 ? vs.filter(v => isGone(v.id)).length : 0;
+    if (left) vs = vs.filter(v => !isGone(v.id));
+    if (!vs.length) { toast('No voters to share (all are marked dead or duplicate)'); return; }
     const token = {}; $('#slipSheet')._token = token;
     $('#slipTitle').textContent = vs.length > 1 ? 'Voter slips' : 'Voter slip';
-    $('#slipSub').textContent = title ? `${title} · ${vs.length} voter${vs.length === 1 ? '' : 's'}${vs.length > SLIPS_PER_IMAGE ? ` · ${Math.ceil(vs.length / SLIPS_PER_IMAGE)} images` : ''}` : `${vs[0].name_en} · Ward ${vs[0].ward} · Serial ${vs[0].serial}`;
+    $('#slipSub').textContent = (title ? `${title} · ${vs.length} voter${vs.length === 1 ? '' : 's'}${vs.length > SLIPS_PER_IMAGE ? ` · ${Math.ceil(vs.length / SLIPS_PER_IMAGE)} images` : ''}` : `${vs[0].name_en} · Ward ${vs[0].ward} · Serial ${vs[0].serial}`)
+      + (left ? ` · ${left} dead / duplicate left out` : '') + (vs.length === 1 && isGone(vs[0].id) ? ` · marked ${statusOf(vs[0].id).k === 'dead' ? 'dead' : 'duplicate'}` : '');
     const prev = $('#slipPrev'), imgBtn = $('#slipImg');
     prev.innerHTML = '<p class="hint" style="margin:8px">Making the slip…</p>'; imgBtn.disabled = true;
     const txt = slipText(vs, title);
@@ -650,6 +664,41 @@
       files.forEach((f, i) => { const a = document.createElement('a'); a.href = prev._urls[i]; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
       toast(files.length > 1 ? 'Images saved. Attach them in WhatsApp.' : 'Image saved. Attach it in WhatsApp.');
     };
+  }
+  // ---------- dead / duplicate ----------
+  function setStatus(id, val) {
+    if (val) notes[stKey(id)] = val; else delete notes[stKey(id)];
+    LS.set('pv_notes', notes); cloud.put('n', stKey(id), val || null);
+    const c = listEl.querySelector(`[data-id="${id}"]`);
+    if (c && c.classList.contains('card')) c.outerHTML = cardHTML(byId.get(id)); else if (c) render();
+    if (S.vst !== 'all') render();
+  }
+  // likely other entries of the same person: same name (Telugu or English) or same EPIC, best first
+  function dupCandidates(v) {
+    const n = phon(v.name_en || ''), te = teNorm(v.name || ''), rn = phon(v.relation_name_en || ''), ep = (v.epic || '').toUpperCase();
+    return V.filter(x => x.id !== v.id && ((n && phon(x.name_en || '') === n) || (te && teNorm(x.name || '') === te) || (ep && (x.epic || '').toUpperCase() === ep)))
+      .map(x => ({ x, sc: ((x.epic || '').toUpperCase() === ep ? 4 : 0) + (rn && phon(x.relation_name_en || '') === rn ? 2 : 0) + (x.house_no && x.house_no === v.house_no ? 1 : 0) + (x.ward === v.ward ? 0.5 : 0) }))
+      .sort((a, b) => b.sc - a.sc || a.x.ward - b.x.ward || a.x.serial - b.x.serial).slice(0, 12).map(e => e.x);
+  }
+  function showDupPick(id) {
+    const v = byId.get(id), sug = dupCandidates(v);
+    const row = x => `<button class="member${isGone(x.id) ? ' gone' : ''}" data-dp="${x.id}">${photo(x)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(x.name || '—')}</div>${wardPill(x)}${stTag(x.id)}</div>
+      <div class="en">${esc(x.name_en)} · ${esc(x.relation)}: ${esc(x.relation_name_en || '—')} · #${x.serial} · House ${esc(x.house_no || '—')} · ${esc(x.epic)}</div></div></button>`;
+    const draw = q => {
+      q = q.trim(); let list = sug;
+      if (q) {
+        const toks = q.split(/\s+/);
+        list = V.filter(x => x.id !== id && toks.every(t => isTelugu(t) ? x._te.includes(teNorm(t)) : /^\d+$/.test(t) ? String(x.serial) === t || x._house.startsWith(t) : x._en.includes(phon(t)) || x.epic.toLowerCase().includes(t.toLowerCase()))).slice(0, 30);
+      }
+      $('#dpList').innerHTML = list.length ? `<div class="house">${list.map(row).join('')}</div>` : `<p class="hint">${q ? 'No voter matches.' : 'No voter with the same name was found. Search for the other entry above, or mark it without one.'}</p>`;
+      $('#dpHead').textContent = q ? 'Search results' : sug.length ? 'Same name in the roll' : '';
+    };
+    $('#dpWho').innerHTML = `${esc(v.name)} · ${esc(v.name_en)} · Ward ${v.ward} #${v.serial} · ${esc(v.epic)}`;
+    const qi = $('#dpQ'); qi.value = ''; qi.oninput = () => draw(qi.value); draw('');
+    $('#dpList').onclick = e => { const b = e.target.closest('[data-dp]'); if (!b) return; setStatus(id, 'dup:' + b.dataset.dp); closeTop(); showDetail(id, true); toast('Marked as duplicate'); };
+    $('#dpNone').onclick = () => { setStatus(id, 'dup'); closeTop(); showDetail(id, true); toast('Marked as duplicate'); };
+    $('#dpCancel').onclick = () => closeTop();
+    openSheet('#dupSheet');
   }
   // ---------- phone numbers ----------
   function setPhones(id, list) {
@@ -713,6 +762,12 @@
         <dt>Serial no.</dt><dd>${v.serial}</dd>
         <dt>Surname</dt><dd>${v.surname ? `${esc(v.surname)} · ${esc(v.surname_en)}<small><button class="linkish" id="dSurname">See all ${SURNAMES.get(v.surname).n} ${esc(v.surname_en)} voters</button></small>` : '—'}</dd>
         <dt>Groups</dt><dd class="fam-dd">${Object.keys(FAM).filter(gid => inGroup(gid, v.id)).map(gid => `<button class="fam-chip" data-fam-open="${gid}">${esc(gLabel(gid))}</button>`).join('')}<button class="fam-chip add" id="dFam">＋ Add to group</button></dd>
+        <dt>Status</dt><dd class="fam-dd st-dd">${(() => {
+          const st = statusOf(v.id), of = st && st.of && byId.get(st.of);
+          if (!st) return `<button class="fam-chip add" id="dDead">✝ Mark as dead</button><button class="fam-chip add" id="dDup">⧉ Mark as duplicate</button>`;
+          return `${stTag(v.id)}${of ? `<button class="linkish" data-dup-of="${of.id}">of #${of.serial} ${esc(of.name_en || of.name)}${of.ward !== v.ward ? ` (Ward ${of.ward})` : ''}</button>` : ''}<button class="fam-chip" id="dStUndo">Undo</button>
+            <small>${whoLine('n', stKey(v.id)).replace(/<\/?p[^>]*>/g, '')}</small>`;
+        })()}</dd>
         <dt>Phone</dt><dd class="ph-dd">${phonesOf(v.id).map(p => `<span class="ph-row"><a class="ph-call" href="tel:+91${p}">📞 ${fmtPhone(p)}</a><a class="ph-wa" href="https://wa.me/91${p}" target="_blank" rel="noopener" aria-label="WhatsApp ${fmtPhone(p)}">WhatsApp</a></span>`).join('')}
           <button class="fam-chip add" id="dPhone">${phonesOf(v.id).length ? '✎ Edit numbers' : '＋ Add phone number'}</button>${notes[telKey(v.id)] ? `<small>${whoLine('n', telKey(v.id)).replace(/<\/?p[^>]*>/g, '')}</small>` : ''}</dd>
         <dt>House no.</dt><dd>${esc(v.house_no || '—')}</dd>
@@ -748,6 +803,15 @@
     };
     $('#dNote').oninput = e => { const val = e.target.value.trim(); if (val) notes[v.id] = val; else delete notes[v.id]; LS.set('pv_notes', notes); cloud.put('n', v.id, notes[v.id] || null); };
     $('#dSlip').onclick = () => showSlips([v]);
+    const onB = (sel, fn) => { const b = $('#detail').querySelector(sel); if (b) b.onclick = fn; };
+    onB('#dDead', async () => {
+      if (!await askSure({ title: `Mark ${v.name_en || v.name} as dead?`, ok: 'Mark as dead', danger: true,
+        body: `<p>The voter stays in the list with a <b>✝ Dead</b> tag${cloud.code ? ', for everyone using your sync code' : ''}. Their slip is left out when sharing family or house slips. You can undo this.</p>` })) return;
+      setStatus(v.id, 'dead'); showDetail(v.id, true); toast('Marked as dead');
+    });
+    onB('#dDup', () => showDupPick(v.id));
+    onB('#dStUndo', () => { setStatus(v.id, ''); showDetail(v.id, true); toast('Status removed'); });
+    $('#detail').querySelectorAll('[data-dup-of]').forEach(b => b.onclick = () => { showDetail(b.dataset.dupOf, true); $('#detailSheet .sheet').scrollTop = 0; });
     $('#detail').querySelectorAll('[data-fam-slip]').forEach(b => b.onclick = () => showSlips(famSlipVoters(b.dataset.famSlip), famName(b.dataset.famSlip)));
     if ($('#dHouseSlip')) $('#dHouseSlip').onclick = () => showSlips([v, ...fam].sort((a, b) => a.serial - b.serial), `House ${v.house_no || '—'}, Ward ${v.ward}`);
     $('#dFam').onclick = () => showFamPick(v.id);
