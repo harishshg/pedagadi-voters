@@ -78,7 +78,7 @@
     if (S.marked && S.view !== 'marked') list = list.filter(v => marks.has(v.id));
     // caste group / family: a group id, or 'none' = not in any group of that kind
     [['cgrp', 'caste'], ['fgrp', 'family']].forEach(([k, t]) => {
-      const val = S[k]; if (!val) return;
+      const val = S[k]; if (!val || S.view === t) return;   // the Families / Castes tab itself ignores its own filter
       if (val === 'none') { const inAny = new Set(); Object.keys(FAM).forEach(gid => { if (gType(gid) === t) gMembers(gid).forEach((_, id) => inAny.add(id)); }); list = list.filter(v => !inAny.has(v.id)); }
       else if (FAM[val]) { const m = gMembers(val); list = list.filter(v => m.has(v.id)); }
       else S[k] = '';
@@ -177,6 +177,11 @@
       listEl.innerHTML = (auto ? `<div class="g-new"><button class="btn primary" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>
           <button class="btn" data-auto-fam>🏠 From houses (${auto})</button></div>`
         : `<button class="btn primary w100 fam-new" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>`) +
+        (t === 'family' && any ? (() => {
+          const inFam = new Set(); Object.keys(FAM).forEach(gid => { if (gType(gid) === 'family') gMembers(gid).forEach((_, id) => inFam.add(id)); });
+          const n = V.filter(v => !inFam.has(v.id) && (!S.ward || v.ward === S.ward)).length;
+          return `<button class="nofam-link" data-nofam>👤 <span>${n ? `<b>${n.toLocaleString()}</b> voter${n === 1 ? ' is' : 's are'} not in any family${S.ward ? ` in Ward ${S.ward}` : ''}` : `Every voter${S.ward ? ` in Ward ${S.ward}` : ''} is in a family`}</span>${n ? '<em>See them ›</em>' : ''}</button>`;
+        })() : '') +
         (t === 'family' && multiFamily().length ? `<button class="dup-warn" data-fix-dups>⚠ ${multiFamily().length} voter${multiFamily().length === 1 ? ' is' : 's are'} in more than one family. <b>Fix ›</b></button>` : '') + revBar +
         (groups.length ? '' : `<div class="empty">${any && t === 'family' && S.frev === 'todo' && !S.q.trim() ? '🎉 Every family is reviewed.' : any && t === 'family' && S.frev === 'done' && !S.q.trim() ? 'No family is reviewed yet.<br>Open a family, check its members and tap “Mark reviewed”.' : any ? `No ${T.label.toLowerCase()} matches.` : t === 'caste'
           ? 'No castes yet.<br>Tap “New caste”, or go to <b>Surnames</b>, select surnames and tap “Set caste”.'
@@ -228,7 +233,7 @@
     mb.classList.toggle('on', inMore);
     mb.firstChild.textContent = S.view === 'house' ? 'Houses' : S.view === 'marked' ? 'Marked' : 'More';
     const fc = S.view === 'surnames' ? (S.snf !== 'all') + (S.snsort !== 'count')
-      : (S.caste !== 'all') + (S.rel !== 'all') + !!S.surname + !!S.cgrp + !!S.fgrp + (S.marked && S.view !== 'marked');
+      : (S.caste !== 'all') + (S.rel !== 'all') + !!S.surname + !!(S.cgrp && S.view !== 'caste') + !!(S.fgrp && S.view !== 'family') + (S.marked && S.view !== 'marked');
     $('#filterCount').textContent = fc ? fc : '';
     // surname dropdown + active filter chips
     const sn = S.surname && SURNAMES.get(S.surname);
@@ -238,8 +243,8 @@
     $('#surnameClear').hidden = !sn;
     const af = [];
     if (S.view !== 'surnames') {
-      if (S.cgrp) af.push(`<button class="af" data-clear="cgrp">${S.cgrp === 'none' ? 'Not in a caste' : esc(gLabel(S.cgrp))} <b>×</b></button>`);
-      if (S.fgrp) af.push(`<button class="af" data-clear="fgrp">${S.fgrp === 'none' ? 'Not in a family' : esc(gLabel(S.fgrp))} <b>×</b></button>`);
+      if (S.cgrp && S.view !== 'caste') af.push(`<button class="af" data-clear="cgrp">${S.cgrp === 'none' ? 'Not in a caste' : esc(gLabel(S.cgrp))} <b>×</b></button>`);
+      if (S.fgrp && S.view !== 'family') af.push(`<button class="af" data-clear="fgrp">${S.fgrp === 'none' ? 'Not in a family' : esc(gLabel(S.fgrp))} <b>×</b></button>`);
       if (S.marked && S.view !== 'marked') af.push(`<button class="af" data-clear="marked">★ Marked only <b>×</b></button>`);
     }
     if (sn && S.view !== 'surnames') af.push(`<button class="af" data-clear="surname">${esc(sn.te)} · ${esc(sn.en)} <b>×</b></button>`);
@@ -501,6 +506,7 @@
     const nw = e.target.closest('[data-new]'); if (nw) { famCreate(nw.dataset.new); return; }
     if (e.target.closest('[data-auto-fam]')) { autoFamilies(); return; }
     if (e.target.closest('[data-fix-dups]')) { showDupFix(); return; }
+    if (e.target.closest('[data-nofam]')) { S.fgrp = 'none'; S.view = 'list'; update(); return; }
     const fr = e.target.closest('[data-frev]'); if (fr) { S.frev = fr.dataset.frev; saveState(); render(); if (selecting) drawSelBar(); return; }
     const sf = e.target.closest('[data-snf]'); if (sf) { S.snf = sf.dataset.snf; saveState(); render(); if (selecting) drawSelBar(); return; }
     const ss = e.target.closest('[data-snsort]'); if (ss) { S.snsort = ss.dataset.snsort; saveState(); render(); return; }
@@ -833,7 +839,7 @@
     return famGroupsAll(t).filter(g => allReview || t !== 'family' || S.frev === 'all' || (S.frev === 'done') === isReviewed(g.gid));
   }
   function famGroupsAll(t) {
-    const filtering = S.q.trim() || S.ward || S.caste !== 'all' || S.rel !== 'all' || S.surname || S.cgrp || S.fgrp || S.marked;
+    const filtering = S.q.trim() || S.ward || S.caste !== 'all' || S.rel !== 'all' || S.surname || (S.cgrp && t !== 'caste') || (S.fgrp && t !== 'family') || S.marked;
     const ok = new Set(current.map(v => v.id));
     return Object.keys(FAM).filter(gid => gType(gid) === t).map(gid => {
       const all = [...gMembers(gid).keys()];

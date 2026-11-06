@@ -370,3 +370,7 @@ body.has-selbar main{padding-bottom:80px}
 .dup-row{border-bottom:1px solid var(--line);padding-bottom:8px}
 .dup-row .fam-dd{padding:0 12px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dup-warn{background:#3a2e12;border-color:#6b5420;color:#f5d48a}}
+
+.nofam-link{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:12px;padding:10px 12px;margin:0 0 10px;font:inherit;font-size:13.5px;cursor:pointer}
+.nofam-link span{flex:1}
+.nofam-link em{font-style:normal;font-weight:700;color:var(--brand);white-space:nowrap}
