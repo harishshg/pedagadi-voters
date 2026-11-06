@@ -532,8 +532,14 @@
     try { await document.fonts.ready; } catch { }
     const cols = vs.length > 1 ? 2 : 1, rows = Math.ceil(vs.length / cols);
     const S = cols === 1 ? 6 : 4;                      // canvas pixels per PDF point
-    const BW = 174, BH = 70, G = 2, M = 6, HEAD = title ? 54 : 46, FOOT = cols === 1 ? 24 : 14;  // one column is too narrow for both dates on one line
-    const W = M * 2 + cols * BW + (cols - 1) * G, H = M + HEAD + rows * (BH + G) - G + FOOT + M;
+    const BW = 174, BH = 70, G = 2, M = 6, HEAD = title ? 54 : 46;
+    const W0 = M * 2 + cols * BW + (cols - 1) * G;
+    // footer dates in small type: one line when they fit (a phone's Telugu font may be wider), otherwise two
+    const FL = 5.5, FN = 6, mc = document.createElement('canvas').getContext('2d');
+    const dw = (lab, num) => { mc.font = `400 ${FL}px ${SLIP_FONT}`; let w = mc.measureText(lab).width; mc.font = `700 ${FN}px "Times New Roman",Times,serif`; return w + mc.measureText(num).width; };
+    const lw = dw('వయస్సు లెక్కింపు తేదీ : ', '01-01-2026'), fw = dw('ప్రచురణ తేదీ : ', '15-04-2026');
+    const two = lw + fw + 8 > W0 - 2 * M - 2, FOOT = two ? 18 : 11;
+    const W = W0, H = M + HEAD + rows * (BH + G) - G + FOOT + M;
     const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
     const c = cv.getContext('2d'); c.scale(S, S);
     const TE = (w, px) => c.font = `${w} ${px}px ${SLIP_FONT}`;
@@ -588,10 +594,10 @@
       // English name under the Telugu one, small and grey, so it can be read by anyone
       if (v.name_en) { c.fillStyle = '#555'; NUM(0); c.font = `italic 5px system-ui,sans-serif`; put(v.name_en, vx + 3, y + 27, vmax - 3); c.fillStyle = '#000'; }
     });
-    const fy = H - M - 3;
-    runs([[() => TE(400, 7.5), 'వయస్సు లెక్కింపు తేదీ : '], [() => NUM(8), '01-01-2026']], L, cols === 1 ? fy - 10 : fy);
-    TE(400, 7.5); let fw = c.measureText('ప్రచురణ తేదీ : ').width; NUM(8); fw += c.measureText('15-04-2026').width;
-    runs([[() => TE(400, 7.5), 'ప్రచురణ తేదీ : '], [() => NUM(8), '15-04-2026']], R - fw, fy);
+    // the two dates in small type; on one line when they fit, otherwise the second goes below
+    const fy = H - M - 2;
+    runs([[() => TE(400, FL), 'వయస్సు లెక్కింపు తేదీ : '], [() => NUM(FN), '01-01-2026']], L, two ? fy - 7 : fy);
+    runs([[() => TE(400, FL), 'ప్రచురణ తేదీ : '], [() => NUM(FN), '15-04-2026']], R - fw, fy);
     return new Promise(res => cv.toBlob(res, 'image/png'));
   }
   const slipFileName = (vs, title, part) => (title ? title.replace(/[^\wఀ-౿ -]+/g, '').trim().replace(/\s+/g, '-') + '-voter-slips' : `voter-slip-${vs[0].epic || vs[0].id}`) + (part ? `-${part.replace(/\D+/g, '-').replace(/^-|-$/g, '')}` : '') + '.png';
