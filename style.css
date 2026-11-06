@@ -418,3 +418,10 @@ body.has-selbar main{padding-bottom:80px}
 .ph-item a{color:var(--ink);font-weight:700;font-size:16px;text-decoration:none;font-variant-numeric:tabular-nums}
 .ph-cc{font-weight:700;color:var(--muted)}
 .ph-add{flex:none;padding:8px 16px;margin:4px -6px 4px 0}
+
+.ph-rm{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:5px 10px;font:inherit;font-size:13px;font-weight:600}
+.ph-item.ask{background:color-mix(in srgb,#dc2626 8%,var(--card));flex-wrap:wrap;gap:8px}
+.ph-item.ask > span:first-child{font-size:14.5px}
+.ph-btns{display:flex;gap:8px;margin-left:auto}
+.ph-btns .btn{flex:none;padding:7px 14px;font-size:14px}
+.ph-btns .btn.danger{margin-top:0;background:#dc2626;color:#fff;border-color:#dc2626}

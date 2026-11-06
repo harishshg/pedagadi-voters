@@ -521,8 +521,12 @@
   function drawPhones(id) {
     const v = byId.get(id), list = phonesOf(id);
     $('#phWho').innerHTML = `${esc(v.name)} · ${esc(v.name_en)} · Ward ${v.ward} #${v.serial}`;
-    $('#phList').innerHTML = list.length ? `<div class="house">${list.map(p => `<div class="ph-item"><a href="tel:+91${p}">📞 ${fmtPhone(p)}</a>
-        <button class="fam-act rm" data-ph-rm="${p}" aria-label="Remove ${fmtPhone(p)}">×</button></div>`).join('')}</div>` : '<p class="hint">No number saved yet.</p>';
+    // removing asks right in the row: "Remove this number?  Keep / Remove"
+    const ask = $('#phList')._ask;
+    $('#phList').innerHTML = list.length ? `<div class="house">${list.map(p => p === ask
+      ? `<div class="ph-item ask"><span>Remove <b>${fmtPhone(p)}</b>?</span><span class="ph-btns"><button class="btn" data-ph-keep>Keep</button><button class="btn danger" data-ph-yes="${p}">Remove</button></span></div>`
+      : `<div class="ph-item"><a href="tel:+91${p}">📞 ${fmtPhone(p)}</a>
+        <button class="ph-rm" data-ph-rm="${p}" aria-label="Remove ${fmtPhone(p)}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12l-1 12H7L6 9zm4 2v8h2v-8h-2zm4 0v8h2v-8h-2z"/></svg>Remove</button></div>`).join('')}</div>` : '<p class="hint">No number saved yet.</p>';
     $('#phHint').textContent = cloud.code ? 'Numbers are shared with everyone who uses your sync code.' : 'Numbers are saved on this device only. Turn on sync to share them.';
     $('#phForm').hidden = list.length >= 5;
   }
@@ -530,10 +534,13 @@
     const inp = $('#phInput'), warn = $('#phWarn');
     inp.value = ''; warn.hidden = true;
     drawPhones(id);
+    $('#phList')._ask = '';
     $('#phList').onclick = e => {
-      const b = e.target.closest('[data-ph-rm]'); if (!b) return;
-      if (!confirm(`Remove ${fmtPhone(b.dataset.phRm)}?`)) return;
-      setPhones(id, phonesOf(id).filter(p => p !== b.dataset.phRm)); drawPhones(id); toast('Number removed');
+      const rm = e.target.closest('[data-ph-rm]'); if (rm) { $('#phList')._ask = rm.dataset.phRm; drawPhones(id); return; }
+      if (e.target.closest('[data-ph-keep]')) { $('#phList')._ask = ''; drawPhones(id); return; }
+      const yes = e.target.closest('[data-ph-yes]'); if (!yes) return;
+      $('#phList')._ask = '';
+      setPhones(id, phonesOf(id).filter(p => p !== yes.dataset.phYes)); drawPhones(id); toast(`${fmtPhone(yes.dataset.phYes)} removed`);
     };
     inp.oninput = () => { warn.hidden = true; };
     $('#phForm').onsubmit = e => {
