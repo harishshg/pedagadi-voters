@@ -145,7 +145,7 @@
 
   function houseHTML(g) {
     const [w, h] = g.key.split('|');
-    return `<div class="house"><div class="house-h"><span>Ward ${w} · House ${esc(h)}</span><small>${g.items.length} voter${g.items.length > 1 ? 's' : ''}</small></div>
+    return `<div class="house"><div class="house-h" data-hk="${esc(g.key)}"><span>Ward ${w} · House ${esc(h)}</span><small>${g.items.length} voter${g.items.length > 1 ? 's' : ''}</small></div>
       ${g.items.map(v => `<button class="member" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag star" style="background:var(--mark)">★</span>' : ''}</div>
       <div class="en">${esc(v.name_en)} · ${esc(v.relation)}: ${esc(v.relation_name_en || '—')} · #${v.serial}</div></div></button>`).join('')}</div>`;
   }
@@ -567,6 +567,13 @@
     if (sr) { if (pressed) { pressed = false; return; } if (selecting) toggleSel(sr.dataset.sn); else showSurname(sr.dataset.sn); return; }
     const gl = e.target.closest('[data-fam-list]'); if (gl) { showGroupInList(gl.dataset.famList); return; }
     const f = e.target.closest('[data-fam-open]'); if (f) { showFam(f.dataset.famOpen); return; }
+    // while selecting, tapping a house / family heading selects (or unselects) everyone in it
+    const hd = selecting && e.target.closest('[data-hk], [data-gk]');
+    if (hd) {
+      const g = groups.find(x => hd.dataset.gk ? x.gid === hd.dataset.gk : x.key === hd.dataset.hk); if (!g) return;
+      const ids = g.items.map(v => v.id), all = ids.every(id => sel.has(id));
+      ids.forEach(id => all ? sel.delete(id) : sel.add(id)); paintSel(); drawSelBar(); return;
+    }
     const b = e.target.closest('[data-id]'); if (!b) return;
     if (pressed) { pressed = false; return; }  // the click that ends a long-press
     if (selecting) toggleSel(b.dataset.id); else showDetail(b.dataset.id);
@@ -613,6 +620,7 @@
     drawSelBar();
   }
   listEl.addEventListener('pointerdown', e => {
+    pressed = false;   // a long-press on a phone may end without a click; never let it swallow the next tap
     const b = e.target.closest('[data-id], [data-sn]'); if (!b || selecting) return;
     pressXY = [e.clientX, e.clientY];
     pressT = setTimeout(() => { pressed = true; if (navigator.vibrate) navigator.vibrate(15); enterSelect(b.dataset.sn || b.dataset.id); }, 500);
@@ -902,7 +910,7 @@
   }
   function famHTML(g) {
     const show = g.items.slice(0, 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
-    return `<div class="house fam"><div class="house-h"><span>${GT[g.t].icon} ${esc(g.name)}${g.t === 'family' && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
+    return `<div class="house fam"><div class="house-h" data-gk="${g.gid}"><span>${GT[g.t].icon} ${esc(g.name)}${g.t === 'family' && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button></div>
       ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
       ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}

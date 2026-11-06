@@ -391,3 +391,9 @@ body.has-selbar main{padding-bottom:80px}
 .top .af{flex:none;white-space:nowrap;border-color:rgba(255,255,255,.55);background:rgba(255,255,255,.16);color:#fff;cursor:pointer}
 .top .af b{color:#fff;opacity:.85}
 .top .af.clear-all{background:#fff;color:var(--brand);border-color:#fff;padding:3px 10px}
+
+.selecting [data-hk],.selecting [data-gk]{cursor:pointer;user-select:none;-webkit-user-select:none}
+.selecting [data-hk] > span::after,.selecting [data-gk] > span::after{content:" · tap to select all";font-weight:500;font-size:12px;color:var(--muted)}
+/* no image preview or text pop-up on long-press, so the long-press starts selecting */
+.list img{-webkit-touch-callout:none;-webkit-user-drag:none}
+.list [data-id],.list [data-sn]{-webkit-touch-callout:none}
