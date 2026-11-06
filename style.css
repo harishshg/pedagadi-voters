@@ -365,3 +365,8 @@ body.has-selbar main{padding-bottom:80px}
 .rev-box.done{background:#ecfdf3;border-color:#a7e3bd;color:#166534;font-weight:600}
 .rev-box .btn{padding:8px 14px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rev-box{background:#3a2e12;border-color:#6b5420;color:inherit}:root:not([data-theme="light"]) .rev-box.done{background:#12301f;border-color:#2b6a44;color:#9be3b5}:root:not([data-theme="light"]) .rev-tag{background:#12301f;color:#9be3b5}}
+
+.dup-warn{display:block;width:100%;text-align:left;border:1px solid #f5d48a;background:#fff7e6;color:#7a4b00;border-radius:12px;padding:10px 12px;margin:0 0 10px;font:inherit;font-size:13.5px;cursor:pointer}
+.dup-row{border-bottom:1px solid var(--line);padding-bottom:8px}
+.dup-row .fam-dd{padding:0 12px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .dup-warn{background:#3a2e12;border-color:#6b5420;color:#f5d48a}}

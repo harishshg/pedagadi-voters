@@ -176,7 +176,8 @@
       const auto = t === 'family' ? autoFamPlan().length : 0;
       listEl.innerHTML = (auto ? `<div class="g-new"><button class="btn primary" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>
           <button class="btn" data-auto-fam>🏠 From houses (${auto})</button></div>`
-        : `<button class="btn primary w100 fam-new" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>`) + revBar +
+        : `<button class="btn primary w100 fam-new" data-new="${t}">＋ New ${T.label.toLowerCase()}</button>`) +
+        (t === 'family' && multiFamily().length ? `<button class="dup-warn" data-fix-dups>⚠ ${multiFamily().length} voter${multiFamily().length === 1 ? ' is' : 's are'} in more than one family. <b>Fix ›</b></button>` : '') + revBar +
         (groups.length ? '' : `<div class="empty">${any && t === 'family' && S.frev === 'todo' && !S.q.trim() ? '🎉 Every family is reviewed.' : any && t === 'family' && S.frev === 'done' && !S.q.trim() ? 'No family is reviewed yet.<br>Open a family, check its members and tap “Mark reviewed”.' : any ? `No ${T.label.toLowerCase()} matches.` : t === 'caste'
           ? 'No castes yet.<br>Tap “New caste”, or go to <b>Surnames</b>, select surnames and tap “Set caste”.'
           : 'No families yet.<br>Tap “New family”, or open a voter and tap “Add to group”.'}</div>`);
@@ -499,6 +500,7 @@
   listEl.addEventListener('click', e => {
     const nw = e.target.closest('[data-new]'); if (nw) { famCreate(nw.dataset.new); return; }
     if (e.target.closest('[data-auto-fam]')) { autoFamilies(); return; }
+    if (e.target.closest('[data-fix-dups]')) { showDupFix(); return; }
     const fr = e.target.closest('[data-frev]'); if (fr) { S.frev = fr.dataset.frev; saveState(); render(); if (selecting) drawSelBar(); return; }
     const sf = e.target.closest('[data-snf]'); if (sf) { S.snf = sf.dataset.snf; saveState(); render(); if (selecting) drawSelBar(); return; }
     const ss = e.target.closest('[data-snsort]'); if (ss) { S.snsort = ss.dataset.snsort; saveState(); render(); return; }
@@ -593,7 +595,7 @@
       const gid = b.dataset.bg, all = ids.every(id => inGroup(gid, id));
       if (all) { if (!confirm(`Remove these ${n} from ${famName(gid)}?`)) return; gRemoveMany(gid, ids); toast(`Removed ${n} from ${famName(gid)}`); showBulkPick(true); return; }
       const added = gAddMany(gid, ids);
-      toast(`Added ${added} to ${famName(gid)}`); leaveSelect();
+      toast(`Added ${added} to ${famName(gid)}${lastMoved ? ` (${lastMoved} moved from another family)` : ''}`); leaveSelect();
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
@@ -634,23 +636,38 @@
     cloud.put(field.toUpperCase(), gid + '|' + key, on || null);
   }
   // many at once: one redraw at the end
+  // a voter belongs to one family: adding them to a family takes them out of any other family (castes are not affected)
+  const familiesOf = (vid, except) => Object.keys(FAM).filter(o => o !== except && gType(o) === 'family' && inGroup(o, vid));
+  function leaveOtherFamilies(gid, vid) {
+    if (gType(gid) !== 'family') return [];
+    const v = byId.get(vid);
+    return familiesOf(vid, gid).map(o => { gSet(o, 'v', vid, false); if (v && v.surname && FAM[o].s[v.surname]) gSet(o, 'x', vid, true); return o; });
+  }
+  let lastMoved = 0;
   function gAddMany(gid, ids) {
-    let n = 0;
-    ids.forEach(vid => { if (inGroup(gid, vid)) return; n++; gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); });
+    let n = 0; lastMoved = 0;
+    ids.forEach(vid => { if (inGroup(gid, vid)) return; n++; if (leaveOtherFamilies(gid, vid).length) lastMoved++; gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); });
     famChanged(); return n;
   }
   function gRemoveMany(gid, ids) {
     ids.forEach(vid => { const v = byId.get(vid); gSet(gid, 'v', vid, false); if (v && v.surname && FAM[gid].s[v.surname]) gSet(gid, 'x', vid, true); });
     famChanged();
   }
-  function gAddVoter(gid, vid) { gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); famChanged(); }
+  function gAddVoter(gid, vid) { const from = leaveOtherFamilies(gid, vid).map(famName); gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); famChanged(); return from; }
+  // toast text for adding one voter: says where they moved from
+  const addedMsg = (gid, from) => from.length ? `Moved from ${from.join(', ')} to ${famName(gid)}` : `Added to ${famName(gid)}`;
   function gRemoveVoter(gid, vid) {
     const v = byId.get(vid), g = FAM[gid];
     gSet(gid, 'v', vid, false);
     if (v && v.surname && g.s[v.surname]) gSet(gid, 'x', vid, true);  // came in through the surname: keep them out
     famChanged();
   }
-  function gSurname(gid, sk, on) { gSurnameRaw(gid, sk, on); famChanged(); }
+  function gSurname(gid, sk, on) {
+    gSurnameRaw(gid, sk, on);
+    // a whole surname added to a family: people already in another family stay there
+    if (on && gType(gid) === 'family') V.forEach(v => { if (v.surname === sk && familiesOf(v.id, gid).length) gSet(gid, 'x', v.id, true); });
+    famChanged();
+  }
   function gSurnameRaw(gid, sk, on) {
     gSet(gid, 's', sk, on);
     // clear per-person exceptions for that surname
@@ -871,6 +888,29 @@
   }
   const snLabel = k => { const s = SURNAMES.get(k); return s ? `${s.te} · ${s.en}` : k; };
 
+  // voters in two or more families (from before families were one per voter, or made on two devices at once)
+  function multiFamily() {
+    const c = new Map();
+    Object.keys(FAM).forEach(gid => { if (gType(gid) === 'family') gMembers(gid).forEach((_, id) => c.set(id, (c.get(id) || 0) + 1)); });
+    return [...c].filter(([, n]) => n > 1).map(([id]) => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
+  }
+  function showDupFix(again) {
+    const list = multiFamily();
+    $('#famPick').innerHTML = `<h2>One family per voter</h2>
+      <p class="fam-sub">${list.length ? `${list.length} voter${list.length === 1 ? ' is' : 's are'} in more than one family. Tap the family each one belongs to; they are taken out of the others.` : '🎉 Every voter is in one family at most.'}</p>
+      ${list.length ? `<div class="house">${list.slice(0, 100).map(v => `<div class="dup-row"><button class="member" data-open="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(v.name || '—')}</div>${wardPill(v)}</div>
+        <div class="en">${esc(v.name_en)} · House ${esc(v.house_no || '—')}</div></div></button>
+        <div class="fam-dd">${familiesOf(v.id).map(gid => `<button class="fam-chip add" data-keep="${gid}" data-vid="${v.id}">Keep in ${esc(famName(gid))}</button>`).join('')}</div></div>`).join('')}</div>` : ''}
+      <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
+    const box = $('#famPick');
+    box.querySelector('#fpClose').onclick = () => closeTop();
+    box.querySelectorAll('[data-open]').forEach(b => b.onclick = () => showDetail(b.dataset.open));
+    box.querySelectorAll('[data-keep]').forEach(b => b.onclick = () => {
+      const gid = b.dataset.keep, from = leaveOtherFamilies(gid, b.dataset.vid); famChanged();
+      toast(`Kept in ${famName(gid)}, taken out of ${from.map(famName).join(', ')}`); showDupFix(true);
+    });
+    if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
+  }
   // the next family still to review, in the order the Families tab shows them
   function nextUnreviewed(gid) {
     const order = famGroupsAll('family').map(g => g.gid), i = order.indexOf(gid);
@@ -906,7 +946,7 @@
         : '<p class="hint">No voters yet. Add a surname above, or open any voter and tap “Add to group”.</p>'}
       ${xs.length ? `<h3>Taken out (${xs.length})</h3><div class="house">${xs.map(v => row(v, 'has a group surname but is not in the group', `<button class="fam-act add" data-readd="${v.id}" aria-label="Put back">＋</button>`)).join('')}</div>` : ''}
       ${t === 'family' ? `<h3>Suggested relatives</h3>
-      ${sug.length ? `<div class="house">${sug.map(e => row(e.v, `<span class="why">${esc(e.why.join(' · '))}</span>`,
+      ${sug.length ? `<div class="house">${sug.map(e => row(e.v, `<span class="why">${esc(e.why.join(' · '))}</span>${familiesOf(e.v.id, gid).length ? ` · <b>in ${esc(familiesOf(e.v.id, gid).map(famName).join(', '))}</b>` : ''}`,
         `<button class="fam-act add" data-add="${e.v.id}" aria-label="Add ${esc(e.v.name_en)}">＋</button>`)).join('')}</div>`
         : `<p class="hint">${mem.length ? 'No more suggestions.' : 'Add one voter first, and the app will suggest their relatives.'}</p>`}
       <p class="hint">Suggestions come from the same house and from the father / husband names in the roll, so check them before adding.</p>` : ''}
@@ -931,8 +971,8 @@
     box.querySelectorAll('[data-sn-rm]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snRm, false); showFam(gid, true); });
     box.querySelectorAll('[data-sn-add]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snAdd, true); toast('Surname added'); showFam(gid, true); });
     box.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { gRemoveVoter(gid, b.dataset.rm); showFam(gid, true); });
-    box.querySelectorAll('[data-readd]').forEach(b => b.onclick = () => { gAddVoter(gid, b.dataset.readd); showFam(gid, true); });
-    box.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { gAddVoter(gid, b.dataset.add); toast('Added'); showFam(gid, true); });
+    box.querySelectorAll('[data-readd]').forEach(b => b.onclick = () => { const from = gAddVoter(gid, b.dataset.readd); if (from.length) toast(addedMsg(gid, from)); showFam(gid, true); });
+    box.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { toast(addedMsg(gid, gAddVoter(gid, b.dataset.add))); showFam(gid, true); });
     box.querySelectorAll('[data-open]').forEach(b => b.onclick = () => showDetail(b.dataset.open));
     if (!replace && !raise('#famSheet')) openSheet('#famSheet');
   }
@@ -940,9 +980,11 @@
   function showFamPick(vid, again) {
     const v = byId.get(vid), sk = v.surname, sn = sk && SURNAMES.get(sk);
     const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
-    const rowP = gid => { const on = inGroup(gid, vid); return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
-      <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : 'Add'}</span></button>`; };
+    const curFam = familiesOf(vid);
+    const rowP = gid => { const on = inGroup(gid, vid), mv = !on && gType(gid) === 'family' && curFam.length; return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
+      <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : mv ? 'Move here' : 'Add'}</span></button>`; };
     $('#famPick').innerHTML = `<h2>Add to group</h2><p class="fam-sub">${esc(v.name)} · ${esc(v.name_en)}</p>
+      ${curFam.length ? `<p class="hint">A voter can be in one family only. Choosing another family moves them out of ${esc(curFam.map(famName).join(', '))}.</p>` : ''}
       <div class="d-actions"><button class="btn primary" id="fpNewF">＋ New family</button><button class="btn primary" id="fpNewC">＋ New caste</button></div>
       ${list.length ? `<h3>Add this person</h3><div class="picker-list fp-list">${list.map(rowP).join('')}</div>` : ''}
       ${list.length && sn ? `<h3>Add everyone named ${esc(sn.en)} (${sn.n})</h3><div class="fam-dd">${list.map(gid => FAM[gid].s[sk]
@@ -955,8 +997,8 @@
     box.querySelector('#fpNewC').onclick = () => { closeTop(); setTimeout(() => famCreate('caste', vid), 60); };
     box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
       const gid = b.dataset.g, on = !inGroup(gid, vid);
-      on ? gAddVoter(gid, vid) : gRemoveVoter(gid, vid);
-      toast(on ? `Added to ${famName(gid)}` : `Removed from ${famName(gid)}`); showFamPick(vid, true);
+      if (on) toast(addedMsg(gid, gAddVoter(gid, vid))); else { gRemoveVoter(gid, vid); toast(`Removed from ${famName(gid)}`); }
+      showFamPick(vid, true);
     });
     box.querySelectorAll('[data-gs]').forEach(b => b.onclick = () => {
       const gid = b.dataset.gs, on = !FAM[gid].s[sk];
