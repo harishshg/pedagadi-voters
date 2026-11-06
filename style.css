@@ -374,3 +374,11 @@ body.has-selbar main{padding-bottom:80px}
 .nofam-link{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:12px;padding:10px 12px;margin:0 0 10px;font:inherit;font-size:13.5px;cursor:pointer}
 .nofam-link span{flex:1}
 .nofam-link em{font-style:normal;font-weight:700;color:var(--brand);white-space:nowrap}
+
+.ff-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;font-size:13px;color:var(--muted);min-height:44px}
+.ff-opt .ff-box{flex:none;width:22px;height:22px;border:2px solid var(--line);border-radius:6px;display:grid;place-items:center;font-size:14px;font-weight:800;color:#fff}
+.ff-opt.sel .ff-box{background:var(--brand);border-color:var(--brand)}
+.ff-opt.sel .o-te::after{content:none}
+.ff-foot{flex:none;padding:10px 0 calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.ff-sel{margin-top:6px}
+.ff-sel .chip b{margin-left:4px}
