@@ -532,7 +532,7 @@
     try { await document.fonts.ready; } catch { }
     const cols = vs.length > 1 ? 2 : 1, rows = Math.ceil(vs.length / cols);
     const S = cols === 1 ? 6 : 4;                      // canvas pixels per PDF point
-    const BW = 174, BH = 70, G = 2, M = 6, HEAD = title ? 54 : 46, FOOT = 14;
+    const BW = 174, BH = 70, G = 2, M = 6, HEAD = title ? 54 : 46, FOOT = cols === 1 ? 24 : 14;  // one column is too narrow for both dates on one line
     const W = M * 2 + cols * BW + (cols - 1) * G, H = M + HEAD + rows * (BH + G) - G + FOOT + M;
     const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
     const c = cv.getContext('2d'); c.scale(S, S);
@@ -547,7 +547,9 @@
     c.strokeStyle = '#000'; c.lineWidth = 0.6; c.strokeRect(M - 2, M - 2, W - 2 * M + 4, H - 2 * M + 4);
     c.fillStyle = '#000'; c.textBaseline = 'alphabetic';
     const mid = W / 2;
-    TE(700, 9.5); put('పెదగాడి గ్రామ పంచాయతీ ఓటర్ల జాబితా - 2026', mid, M + 10, W - 2 * M, 'center');
+    // the title shrinks to fit the narrow single-voter slip instead of being cut off
+    const T1 = 'పెదగాడి గ్రామ పంచాయతీ ఓటర్ల జాబితా - 2026'; TE(700, 9.5); const t1w = c.measureText(T1).width, t1max = W - 2 * M - 2;
+    TE(700, t1w > t1max ? 9.5 * t1max / t1w : 9.5); put(T1, mid, M + 10, 999, 'center');
     TE(700, 8); put('పెందుర్తి శాసనసభ నియోజకవర్గము', mid, M + 20, W - 2 * M, 'center');
     const L = M + 1, R = W - M - 1;
     TE(400, 8.5); runs([[() => TE(400, 8.5), 'గ్రామ పంచాయతీ : '], [() => TE(700, 8.5), 'పెదగాడి']], L, M + 32);
@@ -587,7 +589,7 @@
       if (v.name_en) { c.fillStyle = '#555'; NUM(0); c.font = `italic 5px system-ui,sans-serif`; put(v.name_en, vx + 3, y + 27, vmax - 3); c.fillStyle = '#000'; }
     });
     const fy = H - M - 3;
-    runs([[() => TE(400, 7.5), 'వయస్సు లెక్కింపు తేదీ : '], [() => NUM(8), '01-01-2026']], L, fy);
+    runs([[() => TE(400, 7.5), 'వయస్సు లెక్కింపు తేదీ : '], [() => NUM(8), '01-01-2026']], L, cols === 1 ? fy - 10 : fy);
     TE(400, 7.5); let fw = c.measureText('ప్రచురణ తేదీ : ').width; NUM(8); fw += c.measureText('15-04-2026').width;
     runs([[() => TE(400, 7.5), 'ప్రచురణ తేదీ : '], [() => NUM(8), '15-04-2026']], R - fw, fy);
     return new Promise(res => cv.toBlob(res, 'image/png'));
