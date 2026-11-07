@@ -146,6 +146,14 @@
     return text;
   }
 
+  // the caste groups and family a voter is in, as a small line on the tile
+  function grpLine(v) {
+    const c = [], f = [];
+    Object.keys(FAM).forEach(gid => { if (inGroup(gid, v.id)) (gType(gid) === 'caste' ? c : f).push(esc(famName(gid))); });
+    if (!c.length && !f.length) return '';
+    return `<div class="grp">${c.length ? `<span class="g-c">🏷️ ${c.join(', ')}</span>` : ''}${f.length ? `<span class="g-f">👪 ${f.join(', ')}</span>` : ''}</div>`;
+  }
+
   function cardHTML(v) {
     const st = statusOf(v.id);
     return `<button class="card${st ? ' gone' : ''}" data-id="${v.id}">
@@ -154,6 +162,7 @@
         <div class="nm-row"><div class="nm">${hl(v.name || '(name not in list)', S.q)}</div>${wardPill(v)}</div>
         <div class="en">${esc(v.name_en)}</div>
         <div class="rel">${esc(v.relation)}: ${hl(v.relation_name || '—', S.nameOnly ? '' : S.q)}</div>
+        ${grpLine(v)}
         <div class="meta"><span>House <b>${esc(v.house_no || '—')}</b></span>
           <span class="tag ${casteCls(v.caste)}">${casteLbl(v.caste)}</span>${notes[telKey(v.id)] ? `<span class="has-ph" title="Has a phone number">📞 ${phonesOf(v.id).length > 1 ? phonesOf(v.id).length : ''}</span>` : ''}${stTag(v.id)}</div>
       </div>
@@ -1181,7 +1190,7 @@
     return !!(g.v[vid] || (v && v.surname && g.s[v.surname] && !g.x[vid])); };
   // redraw the list but stay where the user was (load as many rows as before, keep the scroll position)
   function rerenderKeep() { const y = scrollY, n = shown; render(); for (let i = 0; i < 40 && shown < n; i++) { const b = shown; more(); if (shown === b) break; } scrollTo(0, y); }
-  function famChanged() { saveFam(); if (isGroupView() || S.view === 'surnames' || S.cgrp || S.fgrp) rerenderKeep(); refreshDetailFam(); drawChips(); }
+  function famChanged() { saveFam(); rerenderKeep(); refreshDetailFam(); drawChips(); }
   function famNew(name, t) { const gid = rid(); FAM[gid] = { name, t, v: {}, s: {}, x: {} }; cloud.put('G', gid, name); cloud.put('T', gid, t); famChanged(); return gid; }
   // field: 'v' voter, 's' surname, 'x' taken out
   function gSet(gid, field, key, on) {
