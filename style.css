@@ -535,3 +535,7 @@ body.has-selbar main{padding-bottom:80px}
 .fp-search{margin:10px 0 4px}
 .fp-q{width:100%;box-sizing:border-box;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit;font-size:16px;background:#fff;color:#15202b;outline:0}
 .fp-q:focus{border-color:var(--brand)}
+/* age filter: custom From / To range */
+.age-range{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
+.age-range input{width:84px;height:36px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:0 10px;font:inherit;font-size:16px;background:#fff;color:#15202b;outline:0}
+.age-range input:focus{border-color:var(--brand)}

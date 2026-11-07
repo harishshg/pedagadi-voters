@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=59">
+<link rel="stylesheet" href="style.css?v=60">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -77,6 +77,9 @@
       <div id="fsFamily"></div>
       <h3>Category in the roll</h3>
       <div class="chips wrap" id="casteChips"></div>
+      <h3>Age</h3>
+      <div class="chips wrap" id="ageChips"></div>
+      <div class="age-range"><input id="ageMin" type="number" inputmode="numeric" min="18" max="120" placeholder="From" aria-label="Age from"><span>to</span><input id="ageMax" type="number" inputmode="numeric" min="18" max="120" placeholder="To" aria-label="Age to"></div>
       <h3>Phone number</h3>
       <div class="chips wrap" id="phoneChips"></div>
       <h3>Status</h3>
@@ -305,6 +308,6 @@
 <button id="updBar" class="upd-bar" hidden>✨ New version ready · <b>Tap to update</b></button>
 
 <script src="data.js?v=57"></script>
-<script src="app.js?v=59"></script>
+<script src="app.js?v=60"></script>
 </body>
 </html>

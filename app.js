@@ -56,7 +56,7 @@
   Object.values(FAM).forEach(g => { g.t = g.t || 'family'; g.v = g.v || {}; g.s = g.s || {}; g.x = g.x || {}; });
   const saveFam = () => LS.set('pv_fam', FAM);
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false, frev: 'all', fsel: [], phone: 'all', vst: 'all' }, saved, { q: '' });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false, frev: 'all', fsel: [], phone: 'all', vst: 'all', age: 'all' }, saved, { q: '' });
   if (S.view === 'family' && S.gtype === 'caste') S.view = 'caste';  // the old combined Groups tab
   if (saved.group) { if (((LS.get('pv_fam', {})[saved.group]) || {}).t === 'caste') S.cgrp = saved.group; else S.fgrp = saved.group; }
   // the Family filter: '' any, 'none' not in a family, 'sel' = one of the families in S.fsel (an old single family id becomes a selection)
@@ -64,7 +64,7 @@
   if (S.fgrp && S.fgrp !== 'none' && S.fgrp !== 'sel') { S.fsel = [S.fgrp]; S.fgrp = 'sel'; }
   S.rel = 'all'; S.marked = false;  // relation and "only marked" filters were removed from the panel
   const isGroupView = () => S.view === 'family' || S.view === 'caste';
-  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly, frev: S.frev, fsel: S.fsel, phone: S.phone });
+  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly, frev: S.frev, fsel: S.fsel, phone: S.phone, age: S.age });
   // surname index: standard spelling -> { te, en, n }
   const SURNAMES = new Map();
   V.forEach(v => { if (!v.surname) return; const s = SURNAMES.get(v.surname) || { te: v.surname, en: v.surname_en, n: 0 }; s.n++; SURNAMES.set(v.surname, s); });
@@ -72,6 +72,15 @@
 
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // age filter: 'all', 'unk' (age not in the roll), or 'lo-hi' with either end optional ('60-' = 60 and over)
+  const ageRange = a => { const [lo, hi] = String(a).split('-').map(x => x === '' || x == null ? null : +x); return [lo, hi]; };
+  const ageTest = a => {
+    if (a === 'unk') return age => age === '' || age == null;
+    const [lo, hi] = ageRange(a);
+    return age => age !== '' && age != null && (lo == null || age >= lo) && (hi == null || age <= hi);
+  };
+  const ageLbl = a => { if (a === 'unk') return 'Age not known'; const [lo, hi] = ageRange(a);
+    return lo != null && hi != null ? `Age ${lo}–${hi}` : lo != null ? `Age ${lo}+` : `Age up to ${hi}`; };
   const casteCls = c => c === 'Not specified' ? 'NS' : c;
   const casteLbl = c => c === 'Not specified' ? '—' : c;
   const wardPill = v => `<span class="wpill">Ward ${v.ward}</span>`;
@@ -90,6 +99,7 @@
     if (S.rel !== 'all') list = list.filter(v => v.relation === S.rel);
     if (S.surname) list = list.filter(v => v.surname === S.surname);
     if (S.phone !== 'all') list = list.filter(v => !!notes[telKey(v.id)] === (S.phone === 'has'));
+    if (S.age !== 'all') { const ok = ageTest(S.age); list = list.filter(v => ok(v.age)); }
     if (S.vst !== 'all') list = list.filter(v => { const st = statusOf(v.id); return S.vst === 'ok' ? !st : S.vst === 'gone' ? !!st : !!st && st.k === S.vst; });
     if (S.marked && S.view !== 'marked') list = list.filter(v => marks.has(v.id));
     // caste group / family: a group id, or 'none' = not in any group of that kind
@@ -264,6 +274,9 @@
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
     chips($('#statusChips'), [['all', 'Any'], ['ok', 'Active only'], ['dead', '✝ Dead'], ['dup', '⧉ Duplicate'], ['gone', 'Dead or duplicate']], S.vst, v => { S.vst = v; update(); });
+    chips($('#ageChips'), [['all', 'Any'], ['18-25', '18–25'], ['26-35', '26–35'], ['36-45', '36–45'], ['46-59', '46–59'], ['60-', '60+'], ['unk', 'Not known']], S.age, v => { S.age = v; update(); });
+    { const [lo, hi] = S.age === 'all' || S.age === 'unk' ? [null, null] : ageRange(S.age);
+      [['#ageMin', lo], ['#ageMax', hi]].forEach(([id, x]) => { const el = $(id); if (el && document.activeElement !== el) el.value = x == null ? '' : x; }); }
     chips($('#phoneChips'), [['all', 'Any'], ['has', '📞 Has a number'], ['none', 'No number']], S.phone, v => { S.phone = v; update(); });
     chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
     document.querySelectorAll('#viewSeg button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view));
@@ -272,7 +285,7 @@
     mb.classList.toggle('on', inMore);
     mb.firstChild.textContent = S.view === 'house' ? 'Houses' : S.view === 'marked' ? 'Marked' : 'More';
     const fc = S.view === 'surnames' ? (S.snf !== 'all') + (S.snsort !== 'count')
-      : (S.caste !== 'all') + (S.phone !== 'all') + (S.vst !== 'all') + (S.rel !== 'all') + !!S.surname + !!(S.cgrp && S.view !== 'caste') + !!(S.fgrp && S.view !== 'family') + (S.marked && S.view !== 'marked');
+      : (S.caste !== 'all') + (S.age !== 'all') + (S.phone !== 'all') + (S.vst !== 'all') + (S.rel !== 'all') + !!S.surname + !!(S.cgrp && S.view !== 'caste') + !!(S.fgrp && S.view !== 'family') + (S.marked && S.view !== 'marked');
     $('#filterCount').textContent = fc ? fc : '';
     // surname dropdown + active filter chips
     const sn = S.surname && SURNAMES.get(S.surname);
@@ -291,6 +304,7 @@
     }
     if (sn && S.view !== 'surnames') af.push(`<button class="af" data-clear="surname">${esc(sn.te)} · ${esc(sn.en)} <b>×</b></button>`);
     if (S.caste !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="caste">Category: ${esc(casteLbl(S.caste) === '—' ? 'Not specified' : S.caste)} <b>×</b></button>`);
+    if (S.age !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="age">${ageLbl(S.age)} <b>×</b></button>`);
     if (S.phone !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="phone">${S.phone === 'has' ? '📞 Has a number' : 'No phone number'} <b>×</b></button>`);
     if (S.vst !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="vst">${{ ok: 'Active only', dead: '✝ Dead', dup: '⧉ Duplicate', gone: 'Dead or duplicate' }[S.vst]} <b>×</b></button>`);
     if (S.rel !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="rel">${esc(S.rel)} <b>×</b></button>`);
@@ -304,7 +318,7 @@
     const r = e.target.closest('[data-ffrm]'); if (r) { ffToggle(r.dataset.ffrm, false); return; }
     const b = e.target.closest('[data-clear]'); if (!b) return;
     const k = b.dataset.clear;
-    if (k === 'all') { Object.assign(S, { ward: 0, phone: 'all', vst: 'all', caste: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false }); update(); return; }
+    if (k === 'all') { Object.assign(S, { ward: 0, age: 'all', phone: 'all', vst: 'all', caste: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false }); update(); return; }
     if (k === 'ward') { S.ward = 0; update(); return; }
     if (k === 'sort') { S.sort = 'serial'; update(); return; }
     if (k === 'fgrp') S.fsel = []; S[k] = k === 'marked' ? false : ['surname', 'cgrp', 'fgrp'].includes(k) ? '' : 'all'; update();
@@ -406,9 +420,17 @@
   });
   $('#filterBtn').onclick = () => { drawFilterSheet(); openSheet('#filterSheet'); };
   $('#closeFilters').onclick = () => closeTop();
+  // custom age range: From / To boxes (either can be left empty)
+  let ageT = 0;
+  ['#ageMin', '#ageMax'].forEach(id => $(id).oninput = () => { clearTimeout(ageT); ageT = setTimeout(() => {
+    const n = x => { const v = parseInt(x, 10); return v > 0 && v < 130 ? v : ''; };
+    let lo = n($('#ageMin').value), hi = n($('#ageMax').value);
+    if (lo !== '' && hi !== '' && lo > hi) [lo, hi] = [hi, lo];
+    S.age = lo === '' && hi === '' ? 'all' : `${lo}-${hi}`; update();
+  }, 400); });
   $('#resetFilters').onclick = () => {
     if (S.view === 'surnames') { S.snf = 'all'; S.snsort = 'count'; }
-    else Object.assign(S, { caste: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'name' });
+    else Object.assign(S, { caste: 'all', age: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'name' });
     update();
   };
   // the sheet only shows what makes sense on the open tab
@@ -1426,7 +1448,7 @@
     return famGroupsAll(t).filter(g => allReview || t !== 'family' || S.frev === 'all' || (S.frev === 'done') === isReviewed(g.gid));
   }
   function famGroupsAll(t) {
-    const filtering = S.q.trim() || S.ward || S.caste !== 'all' || S.phone !== 'all' || S.rel !== 'all' || S.surname || (S.cgrp && t !== 'caste') || (S.fgrp && t !== 'family') || S.marked;
+    const filtering = S.q.trim() || S.ward || S.caste !== 'all' || S.age !== 'all' || S.phone !== 'all' || S.rel !== 'all' || S.surname || (S.cgrp && t !== 'caste') || (S.fgrp && t !== 'family') || S.marked;
     const ok = new Set(current.map(v => v.id));
     return Object.keys(FAM).filter(gid => gType(gid) === t).map(gid => {
       const all = [...gMembers(gid).keys()];
@@ -1658,7 +1680,7 @@
     const what = o.what === 'sel' && sel.size ? 'sel' : 'all';
     const filt = [S.q.trim() && `Search: “${S.q.trim()}”`, S.surname && `Surname: ${(SURNAMES.get(S.surname) || {}).en || S.surname}`,
       S.caste !== 'all' && `Category: ${S.caste}`, S.phone !== 'all' && (S.phone === 'has' ? 'Has phone' : 'No phone'),
-      S.vst !== 'all' && `Status: ${S.vst}`].filter(Boolean).join(' · ');
+      S.age !== 'all' && ageLbl(S.age), S.vst !== 'all' && `Status: ${S.vst}`].filter(Boolean).join(' · ');
     const title = what === 'sel' ? `Selected ${S.view === 'surnames' ? 'surnames' : 'voters'} (${sel.size})` : $('#summary').textContent;
     let body;
     if (S.view === 'surnames') {
