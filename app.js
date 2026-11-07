@@ -1051,6 +1051,12 @@
     const gl = e.target.closest('[data-fam-list]'); if (gl) { showGroupInList(gl.dataset.famList); return; }
     const f = e.target.closest('[data-fam-open]'); if (f) { showFam(f.dataset.famOpen); return; }
     // family accordion: tap the heading to open / fold it (while selecting, the heading selects instead)
+    const sb = !selecting && e.target.closest('[data-sub]');
+    if (sb) {
+      const key = sb.dataset.sub, gid = key.split('|')[0], g = groups.find(x => x.gid === gid), card = sb.closest('[data-acc-card]'); if (!g || !card) return;
+      subExpanded.has(key) ? subExpanded.delete(key) : subExpanded.add(key);
+      card.outerHTML = famHTML(g); return;
+    }
     const ac = !selecting && e.target.closest('[data-acc]');
     if (ac) {
       const gid = ac.dataset.acc, g = groups.find(x => x.gid === gid), card = ac.closest('[data-acc-card]'); if (!g || !card) return;
@@ -1509,7 +1515,7 @@
       if (gType(gid) !== 'family') return;
       const mem = [...gMembers(gid).keys()].map(id => byId.get(id)).filter(Boolean); if (!mem.length) return;
       const a = Math.min(...mem.map(pos));
-      orderMembers(gid, mem).forEach((v, i) => { if (!r.has(v.id)) r.set(v.id, [a, i]); });
+      orderMembers(gid, mem).forEach((v, i) => { if (!r.has(v.id)) r.set(v.id, [a, i, gid]); });
     });
     return (famRankCache = r);
   }
@@ -1569,8 +1575,27 @@
     if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}</div>`;
     return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}
       ${fam && sn.length ? `<div class="g-sn">Surnames: ${snTxt}</div>` : ''}
-      ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
-      ${more > 0 ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
+      ${!fam ? casteFamiliesHTML(g) : show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
+      ${(fam ? more > 0 : g.items.length) ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
+  }
+  // inside an open caste: its families (biggest first), each folding open to its members; then the people not in a family
+  const subExpanded = new Set();   // 'casteId|familyId' (or 'casteId|none') that are open
+  function casteFamiliesHTML(g) {
+    if (!g.items.length) return '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add surnames.</div>';
+    const r = famRank(), by = new Map(), none = [];
+    g.items.forEach(v => { const x = r.get(v.id), f = x && x[2]; if (f) { if (!by.has(f)) by.set(f, []); by.get(f).push(v); } else none.push(v); });
+    const fams = [...by.entries()].sort((a, b) => b[1].length - a[1].length || famName(a[0]).localeCompare(famName(b[0])));
+    const q = !!S.q.trim(), LIM = 40;
+    const sub = (key, pic, title, subline, vs, total) => {
+      const open = q || subExpanded.has(g.gid + '|' + key);
+      return `<div class="cf${open ? ' open' : ''}"><button class="cf-h" data-sub="${g.gid}|${key}" aria-expanded="${open}"><i class="acc-chev">▸</i>${pic}
+        <span class="fh-t"><b>${title}</b>${subline ? `<em class="fh-sub">${subline}</em>` : ''}</span><small>${vs.length}${total && total !== vs.length ? ` of ${total}` : ''}</small></button>
+        ${open ? vs.slice(0, LIM).map(memberHTML).join('') + (vs.length > LIM ? `<div class="fam-empty">+${vs.length - LIM} more — use “Show all” below.</div>` : '') : ''}</div>`;
+    };
+    return `<div class="cf-sum">${fams.length} famil${fams.length === 1 ? 'y' : 'ies'}${none.length ? ` · ${none.length} not in a family` : ''}</div>` +
+      fams.map(([fid, vs]) => { const hd = headOf(fid), hv = hd && hd.v;
+        return sub(fid, hv ? photo(hv, 'fh-ph sm') : '<div class="ph fh-ph sm"></div>', `👪 ${esc(famName(fid))}`, hv ? `👑 ${esc(hv.name_en || hv.name)}` : '', orderMembers(fid, vs), gMembers(fid).size); }).join('') +
+      (none.length ? sub('none', '<div class="fh-ph sm fh-ic">👤</div>', 'Not in a family', '', [...none].sort(byFamily), 0) : '');
   }
   function memberHTML(v) {
     return `<button class="member" data-id="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${hl(v.name || '—', S.q)}</div>${wardPill(v)}${marks.has(v.id) ? '<span class="tag star" style="background:var(--mark)">★</span>' : ''}</div>

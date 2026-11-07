@@ -585,3 +585,13 @@ body.has-selbar main{padding-bottom:80px}
 /* Filters: Reset / Show N voters stay pinned at the bottom while the sheet scrolls */
 #filterSheet .sheet-actions{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom));z-index:6;background:var(--card);margin:16px -16px calc(-16px - env(safe-area-inset-bottom));padding:10px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);box-shadow:0 -4px 12px rgba(0,0,0,.06)}
 .fh-ic{display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--card)}
+/* families inside an open caste card */
+.cf-sum{padding:6px 12px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line)}
+.cf{border-top:1px solid var(--line)}
+.cf-h{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px 7px 22px;border:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.cf-h small{flex:none;color:var(--muted);font-weight:600}
+.cf.open .acc-chev{transform:rotate(90deg)}
+.cf.open>.cf-h{background:var(--bg)}
+.cf .member{padding-left:34px}
+.fh-ph.sm{width:32px;height:38px;border-radius:7px}
+.fh-ic.sm{font-size:17px}
