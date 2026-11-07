@@ -1578,7 +1578,9 @@
 
   // ---------- stats ----------
   // ---------- print: the whole list on screen (not just the cards loaded so far), or the selected voters ----------
-  const PR = Object.assign({ photos: false, phones: true, what: 'all', layout: 'slips' }, LS.get('pv_print', {}));
+  // photos are on by default; a choice saved before that (v < 2) only keeps its other settings
+  const prSaved = LS.get('pv_print', {}); if (prSaved.v !== 2) delete prSaved.photos;
+  const PR = Object.assign({ photos: true, phones: true, what: 'all', layout: 'slips' }, prSaved);
   const prArea = $('#printArea');
   const prVoterRows = (vs, o, start = 0) => vs.map((v, i) => {
     const st = statusOf(v.id), ph = o.phones ? phonesOf(v.id).map(fmtPhone).join(', ') : '';
@@ -1666,7 +1668,7 @@
   $('#printBtn').onclick = () => { if (!selecting) sel.clear(); PR.what = sel.size ? 'sel' : 'all'; drawPrintSheet(); openSheet('#printSheet'); };
   $('#prCancel').onclick = () => closeTop();
   $('#prGo').onclick = async () => {
-    LS.set('pv_print', { photos: PR.photos, phones: PR.phones, layout: PR.layout });
+    LS.set('pv_print', { v: 2, photos: PR.photos, phones: PR.phones, layout: PR.layout });
     buildPrint(PR); closeTop();
     if (PR.photos && S.view !== 'surnames') { toast('Getting photos ready…'); await prImgs(); }
     setTimeout(() => { prArea._ours = true; window.print(); }, 300);   // let the sheet close first
