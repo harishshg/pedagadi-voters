@@ -634,6 +634,8 @@
     $('#slipTxt').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
     $('#slipClose').onclick = () => closeTop();
     if (!raise('#slipSheet')) openSheet('#slipSheet');
+    $('#slipSheet')._onClose = () => stopVoice(true);
+    drawVoice();
     $('#slipSheet .sheet').scrollTop = 0;
     // build the images now, so the share button works straight away when tapped
     const parts = [];
@@ -663,6 +665,109 @@
       }
       files.forEach((f, i) => { const a = document.createElement('a'); a.href = prev._urls[i]; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
       toast(files.length > 1 ? 'Images saved. Attach them in WhatsApp.' : 'Image saved. Attach it in WhatsApp.');
+    };
+  }
+  // ---------- voice message: record once on this device, share it to WhatsApp with the slips ----------
+  // kept in IndexedDB (too big for localStorage); never synced
+  const idb = (mode, fn) => new Promise((res, rej) => {
+    let rq; try { rq = indexedDB.open('pv', 1); } catch (e) { rej(e); return; }
+    rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
+    rq.onerror = () => rej(rq.error);
+    rq.onsuccess = () => { const tx = rq.result.transaction('kv', mode), r = fn(tx.objectStore('kv')); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error); };
+  });
+  const VOICE_MAX = 180;   // seconds
+  const voice = { rec: null, loaded: false, data: null, url: '', timer: 0, t0: 0, discard: false };
+  const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  async function loadVoice() {
+    if (voice.loaded) return;
+    try { voice.data = await idb('readonly', st => st.get('voice')) || null; } catch { voice.data = null; }
+    voice.loaded = true; setVoiceUrl();
+  }
+  function setVoiceUrl() { if (voice.url) URL.revokeObjectURL(voice.url); voice.url = voice.data ? URL.createObjectURL(voice.data.blob) : ''; }
+  // WhatsApp plays .wav, .m4a and .ogg; Chrome records only WebM, so that is turned into a small mono WAV
+  async function toWav(blob) {
+    const AC = window.AudioContext || window.webkitAudioContext, ac = new AC();
+    try {
+      const src = await ac.decodeAudioData(await blob.arrayBuffer());
+      const rate = 16000, len = Math.ceil(src.duration * rate);
+      const off = new OfflineAudioContext(1, len, rate), n = off.createBufferSource();
+      n.buffer = src; n.connect(off.destination); n.start();
+      const pcm = (await off.startRendering()).getChannelData(0);
+      const buf = new ArrayBuffer(44 + pcm.length * 2), d = new DataView(buf);
+      const w = (o, t) => [...t].forEach((c, i) => d.setUint8(o + i, c.charCodeAt(0)));
+      w(0, 'RIFF'); d.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVEfmt '); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true);
+      d.setUint32(24, rate, true); d.setUint32(28, rate * 2, true); d.setUint16(32, 2, true); d.setUint16(34, 16, true); w(36, 'data'); d.setUint32(40, pcm.length * 2, true);
+      for (let i = 0; i < pcm.length; i++) { const x = Math.max(-1, Math.min(1, pcm[i])); d.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true); }
+      return { blob: new Blob([buf], { type: 'audio/wav' }), ext: 'wav', dur: src.duration };
+    } finally { ac.close && ac.close(); }
+  }
+  async function startVoice() {
+    if (!navigator.mediaDevices || !window.MediaRecorder) { toast('This browser can’t record audio'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+    catch { toast('Microphone not allowed. Allow it in the browser settings.'); return; }
+    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const rec = new MediaRecorder(stream, type ? { mimeType: type } : {}), chunks = [];
+    voice.rec = rec; voice.discard = false; voice.t0 = Date.now();
+    rec.ondataavailable = e => e.data && e.data.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop()); clearInterval(voice.timer); voice.rec = null;
+      if (voice.discard || !chunks.length) { drawVoice(); return; }
+      $('#voiceBox').innerHTML = '<p class="hint">Saving…</p>';
+      const raw = new Blob(chunks, { type: rec.mimeType || type || 'audio/webm' }), dur = (Date.now() - voice.t0) / 1000;
+      let out;
+      if (/webm/.test(raw.type)) { try { out = await toWav(raw); } catch { out = { blob: raw, ext: 'weba', dur }; } }
+      else out = { blob: raw, ext: /mp4|aac/.test(raw.type) ? 'm4a' : 'ogg', dur };
+      if (dur < 1) { toast('Too short. Hold on a little longer.'); drawVoice(); return; }
+      voice.data = { blob: out.blob, ext: out.ext, dur: out.dur || dur, t: Date.now() }; setVoiceUrl();
+      try { await idb('readwrite', st => st.put(voice.data, 'voice')); } catch { toast('Could not save it for later; share it now'); }
+      drawVoice(); toast('Voice message ready');
+    };
+    rec.start(1000);
+    voice.timer = setInterval(() => {
+      const s = (Date.now() - voice.t0) / 1000, el = $('#vcTime');
+      if (el) el.textContent = `${mmss(s)} / ${mmss(VOICE_MAX)}`;
+      if (s >= VOICE_MAX) stopVoice();
+    }, 250);
+    drawVoice();
+  }
+  function stopVoice(discard) { if (voice.rec && voice.rec.state !== 'inactive') { voice.discard = !!discard; voice.rec.stop(); } }
+  async function shareVoice() {
+    const v = voice.data; if (!v) return;
+    const f = new File([v.blob], `voice-message.${v.ext}`, { type: v.blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) {
+      try { await navigator.share({ files: [f], title: 'Voice message' }); }
+      catch (e) { if (e && e.name !== 'AbortError') toast('Sharing failed'); }
+      return;
+    }
+    const a = document.createElement('a'); a.href = voice.url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    toast('Saved. Attach it in WhatsApp.');
+  }
+  async function drawVoice() {
+    const box = $('#voiceBox'); await loadVoice();
+    const mic = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg>';
+    if (voice.rec) {
+      box.innerHTML = `<h3 class="vc-h">Voice message</h3><div class="vc-rec"><span class="vc-dot"></span><b>Recording</b><span id="vcTime" class="vc-time">${mmss((Date.now() - voice.t0) / 1000)} / ${mmss(VOICE_MAX)}</span></div>
+        <div class="vc-row"><button type="button" class="btn" id="vcCancel">Cancel</button><button type="button" class="btn primary" id="vcStop">■ Stop</button></div>`;
+      $('#vcStop').onclick = () => stopVoice(); $('#vcCancel').onclick = () => stopVoice(true); return;
+    }
+    if (!voice.data) {
+      box.innerHTML = `<h3 class="vc-h">Voice message</h3><button type="button" class="btn w100 vc-big" id="vcRec">${mic}<span>Record a voice message</span></button>
+        <p class="hint">Record once (up to 3 minutes) and send it to anyone on WhatsApp. It stays on this device for next time.</p>`;
+      $('#vcRec').onclick = startVoice; return;
+    }
+    const v = voice.data, canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([v.blob], 'voice-message.' + v.ext, { type: v.blob.type })] }));
+    box.innerHTML = `<h3 class="vc-h">Voice message <small>${mmss(v.dur)} · recorded ${esc(ago(v.t))}</small></h3>
+      <audio controls preload="metadata" src="${voice.url}"></audio>
+      <button type="button" class="btn wa-out w100 vc-big" id="vcShare">${WA_ICON}<span>${canShare ? 'Share' : 'Download'} voice message</span></button>
+      <div class="vc-row"><button type="button" class="btn" id="vcAgain">${mic}<span>Record again</span></button><button type="button" class="btn danger" id="vcDel">Delete</button></div>
+      <p class="hint">${canShare ? 'Tap “Share voice message”, then choose WhatsApp and the person. Send the slip first, then the voice message.' : 'This browser can’t share audio directly. Download it, then attach it in WhatsApp.'}</p>`;
+    $('#vcShare').onclick = shareVoice;
+    $('#vcAgain').onclick = startVoice;
+    $('#vcDel').onclick = async () => {
+      if (!await askSure({ title: 'Delete the voice message?', body: 'It is removed from this device. You can record a new one any time.', ok: 'Delete', danger: true })) return;
+      voice.data = null; setVoiceUrl(); try { await idb('readwrite', st => st.delete('voice')); } catch { }
+      drawVoice();
     };
   }
   // ---------- dead / duplicate ----------

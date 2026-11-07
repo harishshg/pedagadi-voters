@@ -457,3 +457,17 @@ body.has-selbar main{padding-bottom:80px}
 .st-dd .tag{margin-right:4px}
 .st-dd small{display:block;width:100%}
 .dp-q{width:100%;margin-top:12px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:15px}
+
+/* voice message in the slip sheet */
+.voice{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.vc-h{font-size:13px;color:var(--muted);text-transform:uppercase;margin:0}
+.vc-h small{text-transform:none;font-weight:500;margin-left:6px}
+.voice .btn{display:flex;align-items:center;justify-content:center;gap:8px}
+.voice audio{width:100%;height:40px}
+.vc-row{display:flex;gap:8px}.vc-row .btn{flex:1}
+.vc-rec{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;background:var(--accent)}
+.vc-time{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:700}
+.vc-dot{width:12px;height:12px;border-radius:50%;background:#e53935;animation:vcblink 1s infinite}
+@keyframes vcblink{50%{opacity:.25}}
+.voice .hint{margin:0}
+.voice .btn.danger{margin-top:0}
