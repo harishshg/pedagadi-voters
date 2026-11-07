@@ -1533,7 +1533,7 @@
       // head of the family (chosen with 👑, else the eldest member): their photo and name help tell families apart
       const hd = headOf(g.gid), hv = hd && hd.v;
       const head = `<div class="house-h fh" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="${isOpen}"><i class="acc-chev">▸</i>${hv ? photo(hv, 'fh-ph') : '<div class="ph fh-ph"></div>'}
-        <span class="fh-t"><b>${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${hv ? `<em class="fh-sub">${hd.chosen ? '👑 ' : ''}${esc(hv.name_en || hv.name)}${hv.age ? `, ${hv.age}` : ''}</em>` : ''}</span>${cnt}</div>`;
+        <span class="fh-t"><b>${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${hv ? `<em class="fh-sub">👑 ${esc(hv.name_en || hv.name)}${hv.age ? `, ${hv.age}` : ''}</em>` : ''}</span>${cnt}</div>`;
       if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}</div>`;
       return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}
       ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
@@ -1641,11 +1641,11 @@
       <p class="hint">${sn.length ? 'Everyone with these surnames is in the group.' : 'Add a surname to include everyone with it — useful for castes.'}</p>
       ${sugSn.length ? `<div class="fam-dd sugg">${sugSn.map(k => `<button class="fam-chip add" data-sn-add="${esc(k)}">＋ ${esc(snLabel(k))} (${SURNAMES.get(k) ? SURNAMES.get(k).n : ''})</button>`).join('')}</div><p class="hint">Surnames of people already in the group.</p>` : ''}
       <h3 class="mem-h">Members (${mem.length.toLocaleString()})${t === 'family' && mem.length > 1 ? `<button class="btn${ro ? ' primary' : ''} mem-ord" id="fOrder">${ro ? '✓ Done' : '↕ Change order'}</button>` : ''}</h3>
-      ${t === 'family' && mem.length ? `<p class="hint">${ro ? 'Use ▲ ▼ to move people. The head always stays on top.' : `Tap 👑 to choose the head of the family.${hd && !hd.chosen ? ' Until then the eldest member is shown as head.' : ''}`}</p>` : ''}
-      ${mem.length ? `<div class="house">${mem.slice(0, LIMIT).map(v => row(v, `${v.id === hid ? `<b class="head-tag">👑 Head${hd.chosen ? '' : ' (eldest)'}</b> · ` : ''}${memMap.get(v.id) === 'surname' ? '<span class="why">via surname</span> · ' : ''}${esc(v.relation)}: ${esc(v.relation_name_en || '—')}`,
+      ${t === 'family' && mem.length ? `<p class="hint">${ro ? 'Use ▲ ▼ to move people. The head always stays on top.' : hd && !hd.chosen ? 'The eldest member is head of the family by default. Tap 👑 on someone else to change it.' : 'Tap 👑 on someone else to change the head of the family.'}</p>` : ''}
+      ${mem.length ? `<div class="house">${mem.slice(0, LIMIT).map(v => row(v, `${v.id === hid ? `<b class="head-tag">👑 Head</b> · ` : ''}${memMap.get(v.id) === 'surname' ? '<span class="why">via surname</span> · ' : ''}${esc(v.relation)}: ${esc(v.relation_name_en || '—')}`,
         ro ? (v.id === hid ? '<span class="fam-act ord-fix" aria-label="Head stays on top">👑</span>'
           : `<button class="fam-act ord" data-mv="${v.id}" data-dir="-1" aria-label="Move ${esc(v.name_en)} up"${rest[0] === v ? ' disabled' : ''}>▲</button><button class="fam-act ord" data-mv="${v.id}" data-dir="1" aria-label="Move ${esc(v.name_en)} down"${rest[rest.length - 1] === v ? ' disabled' : ''}>▼</button>`)
-        : `${t === 'family' ? `<button class="fam-act head${v.id === hid && hd.chosen ? ' on' : ''}" data-head="${v.id}" aria-label="${v.id === hid && hd.chosen ? 'Unset head' : `Make ${esc(v.name_en)} head of the family`}">👑</button>` : ''}<button class="fam-act rm" data-rm="${v.id}" aria-label="Take ${esc(v.name_en)} out">×</button>`)).join('')}</div>
+        : `${t === 'family' ? `<button class="fam-act head${v.id === hid ? ' on' : ''}" data-head="${v.id}" aria-label="${v.id === hid ? 'Head of the family' : `Make ${esc(v.name_en)} head of the family`}">👑</button>` : ''}<button class="fam-act rm" data-rm="${v.id}" aria-label="Take ${esc(v.name_en)} out">×</button>`)).join('')}</div>
         ${mem.length > LIMIT ? `<button class="btn w100" id="fShow2" style="margin-top:8px">Show all ${mem.length.toLocaleString()} in the voter list</button>` : ''}`
         : '<p class="hint">No voters yet. Add a surname above, or open any voter and tap “Add to group”.</p>'}
       ${xs.length ? `<h3>Taken out (${xs.length})</h3><div class="house">${xs.map(v => row(v, 'has a group surname but is not in the group', `<button class="fam-act add" data-readd="${v.id}" aria-label="Put back">＋</button>`)).join('')}</div>` : ''}
@@ -1683,8 +1683,10 @@
     on('#fOrder', () => { famReorder = famReorder === gid ? null : gid; showFam(gid, true); });
     box.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { moveMember(gid, b.dataset.mv, +b.dataset.dir); showFam(gid, true); });
     box.querySelectorAll('[data-head]').forEach(b => b.onclick = () => {
-      const vid = b.dataset.head, v = byId.get(vid), unset = g.h === vid;
-      setHead(gid, unset ? null : vid); toast(unset ? 'Head of the family cleared' : `${v ? v.name_en || v.name : 'This voter'} is now head of the family`); showFam(gid, true);
+      // the eldest is head by default; tapping 👑 on someone else makes them head (tap it on the eldest to go back)
+      const vid = b.dataset.head, v = byId.get(vid), cur = headOf(gid);
+      if (cur && cur.v.id === vid) { toast('Already head of the family. Tap 👑 on someone else to change it.'); return; }
+      setHead(gid, vid); toast(`${v ? v.name_en || v.name : 'This voter'} is now head of the family`); showFam(gid, true);
     });
     box.querySelectorAll('[data-readd]').forEach(b => b.onclick = () => { const from = gAddVoter(gid, b.dataset.readd); if (from.length) toast(addedMsg(gid, from)); showFam(gid, true); });
     box.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { toast(addedMsg(gid, gAddVoter(gid, b.dataset.add))); showFam(gid, true); });
