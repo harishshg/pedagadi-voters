@@ -576,3 +576,9 @@ body.has-selbar main{padding-bottom:80px}
 .fam-act.head{font-size:18px;filter:grayscale(1);opacity:.35}
 .fam-act.head.on{filter:none;opacity:1;background:var(--accent)}
 .head-tag{color:var(--brand);font-weight:700}
+/* family sheet: change the order of members */
+.mem-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mem-ord{font-size:13px;padding:5px 10px;text-transform:none;letter-spacing:0}
+.fam-act.ord{width:44px;font-size:16px;color:var(--brand)}
+.fam-act.ord:disabled{opacity:.25}
+.fam-act.ord-fix{display:flex;align-items:center;justify-content:center;width:88px;font-size:18px}

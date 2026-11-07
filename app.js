@@ -1494,6 +1494,22 @@
     if (vid) g.h = vid; else delete g.h;
     cloud.put('H', gid, vid || null); famChanged();
   }
+  // order of members inside a family: head first, then the order set by hand (synced), then the rest by ward / serial
+  function orderMembers(gid, vs) {
+    const hd = gType(gid) === 'family' ? headOf(gid) : null, hid = hd && hd.v.id;
+    const o = ((FAM[gid] && FAM[gid].o) || '').split(',').filter(Boolean), pos = new Map(o.map((id, i) => [id, i]));
+    const at = v => pos.has(v.id) ? pos.get(v.id) : 1e9;
+    return [...vs].sort((a, b) => (b.id === hid) - (a.id === hid) || at(a) - at(b) || a.ward - b.ward || a.serial - b.serial);
+  }
+  // move one member up (-1) or down (+1); the head stays on top
+  function moveMember(gid, vid, dir) {
+    const g = FAM[gid]; if (!g) return;
+    const hd = headOf(gid), hid = hd && hd.v.id;
+    const ids = orderMembers(gid, [...gMembers(gid).keys()].map(id => byId.get(id)).filter(Boolean)).map(v => v.id).filter(id => id !== hid);
+    const i = ids.indexOf(vid), j = i + dir; if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    g.o = ids.join(','); cloud.put('O', gid, g.o); famChanged();
+  }
   function famGroups(t, allReview) {
     return famGroupsAll(t).filter(g => allReview || t !== 'family' || S.frev === 'all' || (S.frev === 'done') === isReviewed(g.gid));
   }
@@ -1510,7 +1526,7 @@
   const famExpanded = new Set();
   function famHTML(g) {
     const acc = g.t === 'family', isOpen = !acc || famExpanded.has(g.gid) || !!S.q.trim();
-    const show = g.items.slice(0, acc ? 20 : 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
+    const show = (acc ? orderMembers(g.gid, g.items) : g.items).slice(0, acc ? 20 : 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
     const cnt = `<small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button>`;
     if (acc) {
@@ -1596,12 +1612,15 @@
     const order = famGroupsAll('family').map(g => g.gid), i = order.indexOf(gid);
     return [...order.slice(i + 1), ...order.slice(0, Math.max(i, 0))].find(id => id !== gid && !isReviewed(id)) || '';
   }
+  let famReorder = null;   // the family whose sheet is in "Change order" mode
   function showFam(gid, replace) {
     if (!FAM[gid]) { toast('This group was deleted'); return; }
     const g = FAM[gid], t = gType(gid); $('#famSheet')._gid = gid;
     const memMap = gMembers(gid);
     const hd = t === 'family' ? headOf(gid) : null, hid = hd && hd.v.id;
-    const mem = [...memMap.keys()].map(id => byId.get(id)).sort((a, b) => (b.id === hid) - (a.id === hid) || a.ward - b.ward || a.serial - b.serial);
+    const mem = orderMembers(gid, [...memMap.keys()].map(id => byId.get(id)).filter(Boolean));
+    if (famReorder !== gid || !replace) famReorder = null;   // a freshly opened sheet starts in normal mode
+    const ro = t === 'family' && famReorder === gid, rest = mem.filter(v => v.id !== hid);
     const wards = {}; mem.forEach(v => wards[v.ward] = (wards[v.ward] || 0) + 1);
     const sn = Object.keys(g.s), xs = Object.keys(g.x).map(id => byId.get(id)).filter(Boolean);
     const sug = t === 'family' ? suggest(gid, memMap) : [];
@@ -1621,10 +1640,12 @@
         <button class="fam-chip add" id="fAddSn">＋ Add surname</button></div>
       <p class="hint">${sn.length ? 'Everyone with these surnames is in the group.' : 'Add a surname to include everyone with it — useful for castes.'}</p>
       ${sugSn.length ? `<div class="fam-dd sugg">${sugSn.map(k => `<button class="fam-chip add" data-sn-add="${esc(k)}">＋ ${esc(snLabel(k))} (${SURNAMES.get(k) ? SURNAMES.get(k).n : ''})</button>`).join('')}</div><p class="hint">Surnames of people already in the group.</p>` : ''}
-      <h3>Members (${mem.length.toLocaleString()})</h3>
-      ${t === 'family' && mem.length ? `<p class="hint">Tap 👑 to choose the head of the family.${hd && !hd.chosen ? ' Until then the eldest member is shown as head.' : ''}</p>` : ''}
+      <h3 class="mem-h">Members (${mem.length.toLocaleString()})${t === 'family' && mem.length > 1 ? `<button class="btn${ro ? ' primary' : ''} mem-ord" id="fOrder">${ro ? '✓ Done' : '↕ Change order'}</button>` : ''}</h3>
+      ${t === 'family' && mem.length ? `<p class="hint">${ro ? 'Use ▲ ▼ to move people. The head always stays on top.' : `Tap 👑 to choose the head of the family.${hd && !hd.chosen ? ' Until then the eldest member is shown as head.' : ''}`}</p>` : ''}
       ${mem.length ? `<div class="house">${mem.slice(0, LIMIT).map(v => row(v, `${v.id === hid ? `<b class="head-tag">👑 Head${hd.chosen ? '' : ' (eldest)'}</b> · ` : ''}${memMap.get(v.id) === 'surname' ? '<span class="why">via surname</span> · ' : ''}${esc(v.relation)}: ${esc(v.relation_name_en || '—')}`,
-        `${t === 'family' ? `<button class="fam-act head${v.id === hid && hd.chosen ? ' on' : ''}" data-head="${v.id}" aria-label="${v.id === hid && hd.chosen ? 'Unset head' : `Make ${esc(v.name_en)} head of the family`}">👑</button>` : ''}<button class="fam-act rm" data-rm="${v.id}" aria-label="Take ${esc(v.name_en)} out">×</button>`)).join('')}</div>
+        ro ? (v.id === hid ? '<span class="fam-act ord-fix" aria-label="Head stays on top">👑</span>'
+          : `<button class="fam-act ord" data-mv="${v.id}" data-dir="-1" aria-label="Move ${esc(v.name_en)} up"${rest[0] === v ? ' disabled' : ''}>▲</button><button class="fam-act ord" data-mv="${v.id}" data-dir="1" aria-label="Move ${esc(v.name_en)} down"${rest[rest.length - 1] === v ? ' disabled' : ''}>▼</button>`)
+        : `${t === 'family' ? `<button class="fam-act head${v.id === hid && hd.chosen ? ' on' : ''}" data-head="${v.id}" aria-label="${v.id === hid && hd.chosen ? 'Unset head' : `Make ${esc(v.name_en)} head of the family`}">👑</button>` : ''}<button class="fam-act rm" data-rm="${v.id}" aria-label="Take ${esc(v.name_en)} out">×</button>`)).join('')}</div>
         ${mem.length > LIMIT ? `<button class="btn w100" id="fShow2" style="margin-top:8px">Show all ${mem.length.toLocaleString()} in the voter list</button>` : ''}`
         : '<p class="hint">No voters yet. Add a surname above, or open any voter and tap “Add to group”.</p>'}
       ${xs.length ? `<h3>Taken out (${xs.length})</h3><div class="house">${xs.map(v => row(v, 'has a group surname but is not in the group', `<button class="fam-act add" data-readd="${v.id}" aria-label="Put back">＋</button>`)).join('')}</div>` : ''}
@@ -1659,6 +1680,8 @@
     box.querySelectorAll('[data-sn-rm]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snRm, false); showFam(gid, true); });
     box.querySelectorAll('[data-sn-add]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snAdd, true); toast('Surname added'); showFam(gid, true); });
     box.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { gRemoveVoter(gid, b.dataset.rm); showFam(gid, true); });
+    on('#fOrder', () => { famReorder = famReorder === gid ? null : gid; showFam(gid, true); });
+    box.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { moveMember(gid, b.dataset.mv, +b.dataset.dir); showFam(gid, true); });
     box.querySelectorAll('[data-head]').forEach(b => b.onclick = () => {
       const vid = b.dataset.head, v = byId.get(vid), unset = g.h === vid;
       setHead(gid, unset ? null : vid); toast(unset ? 'Head of the family cleared' : `${v ? v.name_en || v.name : 'This voter'} is now head of the family`); showFam(gid, true);
@@ -1910,7 +1933,7 @@
     put(type, id, val) {
       if (!this.code) return;
       // deleting a family group drops any member changes for it that are still waiting
-      if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TRVSXH]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
+      if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TRVSXHO]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
       this.q[type + ':' + id] = val; if (!this.hold) LS.set('pv_sync_q', this.q);
       if (type === 'm' || type === 'n') {
         if (val === null) delete this.who[type + ':' + id]; else this.who[type + ':' + id] = { by: this.myName, d: this.dev, t: Date.now() };
@@ -1931,12 +1954,13 @@
         const mask = part.flatMap(k => {
           const [t, id] = [k[0], k.slice(2)], val = this.q[k]; sent[k] = val;
           // groups: g.<gid>.name, g.<gid>.t, and g.<gid>.v / .s / .x .<key> (voters, surnames, taken out)
-          if ('GTRVSXH'.includes(t)) {
+          if ('GTRVSXHO'.includes(t)) {
             const [gid, key] = id.split('|'), gf = body.fields.g.mapValue.fields;
             if (t === 'G' && val === null) return [path(['g', gid])];
             const grp = gf[gid] || (gf[gid] = { mapValue: { fields: { v: F(), s: F(), x: F() } } });
             if (t === 'R') { if (val !== null) grp.mapValue.fields.r = { stringValue: String(val) }; return [path(['g', gid, 'r'])]; }
             if (t === 'H') { if (val !== null) grp.mapValue.fields.h = { stringValue: String(val) }; return [path(['g', gid, 'h'])]; }
+            if (t === 'O') { if (val !== null) grp.mapValue.fields.o = { stringValue: String(val) }; return [path(['g', gid, 'o'])]; }
             if (t === 'G' || t === 'T') { const f = t === 'G' ? 'name' : 't'; grp.mapValue.fields[f] = { stringValue: String(val) }; return [path(['g', gid, f])]; }
             const f = t.toLowerCase();
             if (val !== null) grp.mapValue.fields[f].mapValue.fields[key] = { booleanValue: true };
@@ -1980,6 +2004,7 @@
         g[gid] = { name: (gf.name && gf.name.stringValue) || '', t: (gf.t && gf.t.stringValue) || 'family', v: set('v'), s: set('s'), x: set('x') };
         if (gf.r && typeof gf.r.stringValue === 'string') g[gid].r = gf.r.stringValue;
         if (gf.h && gf.h.stringValue) g[gid].h = gf.h.stringValue;
+        if (gf.o && gf.o.stringValue) g[gid].o = gf.o.stringValue;
       });
       return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {}, name: str('name'), owner: str('owner'), p, who, g };
     },
@@ -2042,13 +2067,14 @@
       // family groups: cloud copy + changes still waiting to be sent
       const g = JSON.parse(JSON.stringify(d.g || {}));
       Object.entries(this.q).forEach(([k, val]) => {
-        const t = k[0]; if (!'GTRVSXH'.includes(t)) return;
+        const t = k[0]; if (!'GTRVSXHO'.includes(t)) return;
         const [gid, key] = k.slice(2).split('|');
         if (t === 'G' && val === null) { delete g[gid]; return; }
         const grp = g[gid] = g[gid] || { name: '', t: 'family', v: {}, s: {}, x: {} };
         if (t === 'G') grp.name = val; else if (t === 'T') grp.t = val;
         else if (t === 'R') { if (val === null) delete grp.r; else grp.r = val; }
         else if (t === 'H') { if (val === null) delete grp.h; else grp.h = val; }
+        else if (t === 'O') { if (val === null) delete grp.o; else grp.o = val; }
         else { const f = t.toLowerCase(); if (val) grp[f][key] = true; else delete grp[f][key]; }
       });
       if (JSON.stringify(g) !== JSON.stringify(FAM)) {
