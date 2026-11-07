@@ -1524,26 +1524,30 @@
       return { gid, name: famName(gid), t: gType(gid), items, total: all.length };
     }).filter(g => g.items.length || !filtering).sort(S.gsort === 'size' ? (a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name) : (a, b) => a.name.localeCompare(b.name));
   }
-  // families fold up to just their heading (accordion); tap the heading to see the members. Searching opens them all.
   const famExpanded = new Set();
   function famHTML(g) {
-    const acc = g.t === 'family', isOpen = !acc || famExpanded.has(g.gid) || !!S.q.trim();
-    const show = (acc ? orderMembers(g.gid, g.items) : g.items).slice(0, acc ? 20 : 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
+    // families and castes both fold up to their heading (accordion); tap it to see the members. Searching opens them all.
+    const fam = g.t === 'family', isOpen = famExpanded.has(g.gid) || !!S.q.trim();
+    const show = (fam ? orderMembers(g.gid, g.items) : g.items).slice(0, 20), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
+    const snTxt = sn.length ? `${sn.slice(0, 4).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 4 ? ` +${sn.length - 4}` : ''}` : '';
     const cnt = `<small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button>`;
-    if (acc) {
+    let pic, sub;
+    if (fam) {
       // head of the family (chosen with 👑, else the eldest member): their photo and name help tell families apart
       const hd = headOf(g.gid), hv = hd && hd.v;
-      const head = `<div class="house-h fh" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="${isOpen}"><i class="acc-chev">▸</i>${hv ? photo(hv, 'fh-ph') : '<div class="ph fh-ph"></div>'}
-        <span class="fh-t"><b>${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${hv ? `<em class="fh-sub">👑 ${esc(hv.name_en || hv.name)}${hv.age ? `, ${hv.age}` : ''}</em>` : ''}</span>${cnt}</div>`;
-      if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}</div>`;
-      return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}
-      ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
-      ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
-      ${more > 0 ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
+      pic = hv ? photo(hv, 'fh-ph') : '<div class="ph fh-ph"></div>';
+      sub = hv ? `👑 ${esc(hv.name_en || hv.name)}${hv.age ? `, ${hv.age}` : ''}` : '';
+    } else {
+      // a caste: its icon, and the surnames that make it up
+      pic = `<div class="fh-ph fh-ic">${GT[g.t].icon}</div>`;
+      sub = snTxt ? `Surnames: ${snTxt}` : '';
     }
-    return `<div class="house fam"><div class="house-h" data-gk="${g.gid}"><span>${GT[g.t].icon} ${esc(g.name)}</span>${cnt}</div>
-      ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
+    const head = `<div class="house-h fh" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="${isOpen}"><i class="acc-chev">▸</i>${pic}
+      <span class="fh-t"><b>${esc(g.name)}${fam && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${sub ? `<em class="fh-sub">${sub}</em>` : ''}</span>${cnt}</div>`;
+    if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}</div>`;
+    return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}
+      ${fam && sn.length ? `<div class="g-sn">Surnames: ${snTxt}</div>` : ''}
       ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
       ${more > 0 ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
   }
