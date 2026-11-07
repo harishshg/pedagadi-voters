@@ -272,6 +272,7 @@
   function drawChips() {
     const wards = [[0, 'All wards']].concat([...Array(10)].map((_, i) => [i + 1, `Ward ${i + 1}`]));
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
+    if (S.caste !== 'all') $('#moreFilters').open = true;   // never hide a filter that is on
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
     chips($('#statusChips'), [['all', 'Any'], ['ok', 'Active only'], ['dead', '✝ Dead'], ['dup', '⧉ Duplicate'], ['gone', 'Dead or duplicate']], S.vst, v => { S.vst = v; update(); });
     chips($('#ageChips'), [['all', 'Any'], ['18-25', '18–25'], ['26-35', '26–35'], ['36-45', '36–45'], ['46-59', '46–59'], ['60-', '60+'], ['unk', 'Not known']], S.age, v => { S.age = v; update(); });
@@ -418,7 +419,7 @@
     };
     sh.addEventListener('touchend', end); sh.addEventListener('touchcancel', end);
   });
-  $('#filterBtn').onclick = () => { drawFilterSheet(); openSheet('#filterSheet'); };
+  $('#filterBtn').onclick = () => { drawFilterSheet(); if (S.caste !== 'all') $('#moreFilters').open = true; openSheet('#filterSheet'); };
   $('#closeFilters').onclick = () => closeTop();
   // custom age range: From / To boxes (either can be left empty)
   let ageT = 0;

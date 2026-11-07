@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=60">
+<link rel="stylesheet" href="style.css?v=61">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -82,8 +82,11 @@
       <div class="chips wrap" id="phoneChips"></div>
       <h3>Status</h3>
       <div class="chips wrap" id="statusChips"></div>
-      <h3>Category in the roll</h3>
-      <div class="chips wrap" id="casteChips"></div>
+      <details class="more-f" id="moreFilters">
+        <summary>More filters</summary>
+        <h3>Category in the roll</h3>
+        <div class="chips wrap" id="casteChips"></div>
+      </details>
       <div id="fsSort"><h3>Sort by</h3><div class="chips wrap" id="sortChips"></div></div>
     </div>
     <div class="sheet-actions">
@@ -308,6 +311,6 @@
 <button id="updBar" class="upd-bar" hidden>✨ New version ready · <b>Tap to update</b></button>
 
 <script src="data.js?v=57"></script>
-<script src="app.js?v=60"></script>
+<script src="app.js?v=61"></script>
 </body>
 </html>

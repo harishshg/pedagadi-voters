@@ -539,3 +539,9 @@ body.has-selbar main{padding-bottom:80px}
 .age-range{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
 .age-range input{width:84px;height:36px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:0 10px;font:inherit;font-size:16px;background:#fff;color:#15202b;outline:0}
 .age-range input:focus{border-color:var(--brand)}
+/* "More filters": rarely used filters, folded away */
+.more-f{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.more-f>summary{list-style:none;cursor:pointer;font-size:14px;font-weight:700;color:var(--brand);padding:4px 0;display:flex;align-items:center;gap:6px}
+.more-f>summary::-webkit-details-marker{display:none}
+.more-f>summary::before{content:'▸';display:inline-block;transition:transform .15s}
+.more-f[open]>summary::before{transform:rotate(90deg)}
