@@ -1044,6 +1044,13 @@
     if (sr) { if (pressed) { pressed = false; return; } if (selecting) toggleSel(sr.dataset.sn); else showSurname(sr.dataset.sn); return; }
     const gl = e.target.closest('[data-fam-list]'); if (gl) { showGroupInList(gl.dataset.famList); return; }
     const f = e.target.closest('[data-fam-open]'); if (f) { showFam(f.dataset.famOpen); return; }
+    // family accordion: tap the heading to open / fold it (while selecting, the heading selects instead)
+    const ac = !selecting && e.target.closest('[data-acc]');
+    if (ac) {
+      const gid = ac.dataset.acc, g = groups.find(x => x.gid === gid), card = ac.closest('[data-acc-card]'); if (!g || !card) return;
+      famExpanded.has(gid) ? famExpanded.delete(gid) : famExpanded.add(gid);
+      card.outerHTML = famHTML(g); return;
+    }
     // while selecting, tapping a house / family heading selects (or unselects) everyone in it
     const hd = selecting && e.target.closest('[data-hk], [data-gk]');
     if (hd) {
@@ -1487,9 +1494,14 @@
       return { gid, name: famName(gid), t: gType(gid), items, total: all.length };
     }).filter(g => g.items.length || !filtering).sort(S.gsort === 'size' ? (a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name) : (a, b) => a.name.localeCompare(b.name));
   }
+  // families fold up to just their heading (accordion); tap the heading to see the members. Searching opens them all.
+  const famExpanded = new Set();
   function famHTML(g) {
-    const show = g.items.slice(0, 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
-    return `<div class="house fam"><div class="house-h" data-gk="${g.gid}"><span>${GT[g.t].icon} ${esc(g.name)}${g.t === 'family' && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
+    const acc = g.t === 'family', isOpen = !acc || famExpanded.has(g.gid) || !!S.q.trim();
+    const show = g.items.slice(0, acc ? 20 : 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
+    if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}"><div class="house-h" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="false"><span><i class="acc-chev">▸</i>${GT[g.t].icon} ${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
+      <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button></div></div>`;
+    return `<div class="house fam${acc ? ' acc open' : ''}"${acc ? ` data-acc-card="${g.gid}"` : ''}><div class="house-h" data-gk="${g.gid}"${acc ? ` data-acc="${g.gid}" role="button" aria-expanded="true"` : ''}><span>${acc ? '<i class="acc-chev">▸</i>' : ''}${GT[g.t].icon} ${esc(g.name)}${g.t === 'family' && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button></div>
       ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
       ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
