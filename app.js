@@ -2067,5 +2067,19 @@
   window.addEventListener('online', () => { if (!photoState.finished) cacheAllPhotos(); });
 
   drawChips(); render();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
+  // new versions: check whenever the app comes back to the screen; when one is installed, reload
+  // straight away if nothing is open, otherwise offer an "Update" button
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    const hadSW = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      const check = () => reg.update().catch(() => { });
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+      setInterval(check, 30 * 60 * 1000);
+    }).catch(() => { });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadSW) return;
+      if (!open.length && !selecting && !(voice && voice.rec)) { location.reload(); return; }
+      const b = $('#updBar'); b.hidden = false; b.onclick = () => location.reload();
+    });
+  }
 })();

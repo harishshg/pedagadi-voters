@@ -471,3 +471,5 @@ body.has-selbar main{padding-bottom:80px}
 @keyframes vcblink{50%{opacity:.25}}
 .voice .hint{margin:0}
 .voice .btn.danger{margin-top:0}
+.upd-bar{position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);z-index:98;border:0;border-radius:999px;background:var(--brand);color:#fff;padding:10px 16px;font:inherit;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,.25);white-space:nowrap}
+.upd-bar[hidden]{display:none}
