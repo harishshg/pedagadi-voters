@@ -1635,11 +1635,14 @@
         : `<div class="rev-box"><span>Not reviewed yet. Check the members, add or remove people, then mark it.</span><button class="btn primary" id="fRev">✓ Mark reviewed</button></div>`) : ''}
       ${t === 'family' && mem.length ? `<button class="btn wa w100 wa-slip" id="fSlip">${WA_ICON}<span>Share ${mem.length === 1 ? 'voter slip' : `all ${mem.length} voter slips`} on WhatsApp</span></button>` : ''}
       <div class="d-actions"><button class="btn" id="fShow">Show in list</button><button class="btn" id="fRename">Rename</button><button class="btn danger" id="fDelete">Delete</button></div>
-      <h3>Surnames in this group</h3>
+      ${t === 'family' ? (sn.length ? `<h3>Surnames in this family</h3>
+      <div class="fam-dd">${sn.map(k => `<span class="fam-chip sn">${esc(snLabel(k))} <small>${SURNAMES.get(k) ? SURNAMES.get(k).n : ''}</small><button data-sn-rm="${esc(k)}" aria-label="Remove surname">×</button></span>`).join('')}</div>
+      <p class="hint">Everyone with these surnames is in this family. Tap × to stop that; people added one by one stay.</p>` : '')
+      : `<h3>Surnames in this group</h3>
       <div class="fam-dd">${sn.map(k => `<span class="fam-chip sn">${esc(snLabel(k))} <small>${SURNAMES.get(k) ? SURNAMES.get(k).n : ''}</small><button data-sn-rm="${esc(k)}" aria-label="Remove surname">×</button></span>`).join('')}
         <button class="fam-chip add" id="fAddSn">＋ Add surname</button></div>
       <p class="hint">${sn.length ? 'Everyone with these surnames is in the group.' : 'Add a surname to include everyone with it — useful for castes.'}</p>
-      ${sugSn.length ? `<div class="fam-dd sugg">${sugSn.map(k => `<button class="fam-chip add" data-sn-add="${esc(k)}">＋ ${esc(snLabel(k))} (${SURNAMES.get(k) ? SURNAMES.get(k).n : ''})</button>`).join('')}</div><p class="hint">Surnames of people already in the group.</p>` : ''}
+      ${sugSn.length ? `<div class="fam-dd sugg">${sugSn.map(k => `<button class="fam-chip add" data-sn-add="${esc(k)}">＋ ${esc(snLabel(k))} (${SURNAMES.get(k) ? SURNAMES.get(k).n : ''})</button>`).join('')}</div><p class="hint">Surnames of people already in the group.</p>` : ''}`}
       <h3 class="mem-h">Members (${mem.length.toLocaleString()})${t === 'family' && mem.length > 1 ? `<button class="btn${ro ? ' primary' : ''} mem-ord" id="fOrder">${ro ? '✓ Done' : '↕ Change order'}</button>` : ''}</h3>
       ${t === 'family' && mem.length ? `<p class="hint">${ro ? 'Use ▲ ▼ to move people. The head always stays on top.' : hd && !hd.chosen ? 'The eldest member is head of the family by default. Tap 👑 on someone else to change it.' : 'Tap 👑 on someone else to change the head of the family.'}</p>` : ''}
       ${mem.length ? `<div class="house">${mem.slice(0, LIMIT).map(v => row(v, `${v.id === hid ? `<b class="head-tag">👑 Head</b> · ` : ''}${memMap.get(v.id) === 'surname' ? '<span class="why">via surname</span> · ' : ''}${esc(v.relation)}: ${esc(v.relation_name_en || '—')}`,
@@ -1676,7 +1679,7 @@
         body: `<p>This ${GT[t].label.toLowerCase()} and its list of ${nm} voter${nm === 1 ? '' : 's'} are removed${cloud.code ? ' for everyone using your sync code' : ''}. The voters themselves are not deleted.</p>` }) || !FAM[gid]) return;
       delete FAM[gid]; cloud.put('G', gid, null); if (S.cgrp === gid) S.cgrp = ''; S.fsel = S.fsel.filter(x => x !== gid); if (S.fgrp === 'sel' && !S.fsel.length) S.fgrp = ''; famChanged(); closeTop(); toast('Group deleted');
     };
-    box.querySelector('#fAddSn').onclick = () => openSurnamePicker(gid);
+    on('#fAddSn', () => openSurnamePicker(gid));   // castes only: families are built person by person
     box.querySelectorAll('[data-sn-rm]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snRm, false); showFam(gid, true); });
     box.querySelectorAll('[data-sn-add]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snAdd, true); toast('Surname added'); showFam(gid, true); });
     box.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { gRemoveVoter(gid, b.dataset.rm); showFam(gid, true); });
@@ -1700,6 +1703,7 @@
     const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
     const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
     const curFam = familiesOf(vid);
+    const castesL = list.filter(gid => gType(gid) === 'caste');   // whole-surname adding is for castes only (it added people to families by accident)
     const rowP = gid => { const on = inGroup(gid, vid), mv = !on && gType(gid) === 'family' && curFam.length; return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
       <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : mv ? 'Move here' : 'Add'}</span></button>`; };
     $('#famPick').innerHTML = `<h2>Add to group</h2><p class="fam-sub">${esc(v.name)} · ${esc(v.name_en)}</p>
@@ -1707,7 +1711,7 @@
       <div class="d-actions"><button class="btn primary" id="fpNewF">＋ New family</button><button class="btn primary" id="fpNewC">＋ New caste</button></div>
       ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Add this person</h3><div class="picker-list fp-list">${list.map(rowP).join('')}</div>` : ''}
-      ${list.length && sn ? `<h3>Add everyone named ${esc(sn.en)} (${sn.n})</h3><div class="fam-dd">${list.map(gid => FAM[gid].s[sk]
+      ${castesL.length && sn ? `<h3>Add everyone named ${esc(sn.en)} (${sn.n}) to a caste</h3><div class="fam-dd">${castesL.map(gid => FAM[gid].s[sk]
         ? `<button class="fam-chip" data-gs="${gid}">✓ ${esc(gLabel(gid))}</button>` : `<button class="fam-chip add" data-gs="${gid}">＋ ${esc(gLabel(gid))}</button>`).join('')}</div>
         <p class="hint">Adds the whole surname to the group, including people added to the roll later.</p>` : ''}
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
