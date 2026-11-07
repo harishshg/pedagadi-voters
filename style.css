@@ -531,3 +531,7 @@ body.has-selbar main{padding-bottom:80px}
   .ps-g{margin-top:6px}
   .ps-gh{font-weight:700;font-size:11px;padding:2px 0;break-after:avoid;page-break-after:avoid}
 }
+/* search box in the Add to family / caste picker */
+.fp-search{margin:10px 0 4px}
+.fp-q{width:100%;box-sizing:border-box;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit;font-size:16px;background:#fff;color:#15202b;outline:0}
+.fp-q:focus{border-color:var(--brand)}

@@ -1071,12 +1071,35 @@
     const vs = [...sel].map(id => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
     if (vs.length) showSlips(vs, vs.length > 1 ? 'Selected voters' : '');
   };
+  // search box for the group pickers: filters the group rows (and surname chips) as you type; kept while the sheet redraws
+  let fpQ = '';
+  const fpSearchHTML = n => n ? `<div class="fp-search"><input type="search" class="fp-q" placeholder="Search ${n} families and castes…" value="${esc(fpQ)}" autocomplete="off" enterkeyhint="search"></div>` : '';
+  function wireFpSearch(box, refocus) {
+    const inp = box.querySelector('.fp-q'); if (!inp) return;
+    const apply = () => {
+      fpQ = inp.value; const toks = fpQ.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      let any = false;
+      box.querySelectorAll('[data-g], [data-bg], [data-gs]').forEach(el => {
+        const name = famName(el.dataset.g || el.dataset.bg || el.dataset.gs).toLowerCase();
+        const hit = toks.every(t => name.includes(t)); el.style.display = hit ? '' : 'none';
+        if (hit && !el.dataset.gs) any = true;
+      });
+      let none = box.querySelector('.fp-none');
+      if (!none) { none = document.createElement('p'); none.className = 'hint fp-none'; box.querySelector('.fp-list')?.after(none); }
+      none.hidden = any || !toks.length; none.textContent = `No family or caste matches “${fpQ.trim()}”. Tap “New family” to make it.`;
+    };
+    inp.oninput = apply; apply();
+    if (refocus) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
   // add the selected voters to a group
   function showBulkPick(again) {
     const ids = [...sel], n = ids.length;
+    if (!again) fpQ = '';
+    const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
     const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
     $('#famPick').innerHTML = `<h2>Add ${n} voter${n === 1 ? '' : 's'} to a group</h2>
       <div class="d-actions"><button class="btn primary" id="bpNewF">＋ New family</button><button class="btn primary" id="bpNewC">＋ New caste</button></div>
+      ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Your groups</h3><div class="picker-list fp-list">${list.map(gid => {
         const inN = ids.filter(id => inGroup(gid, id)).length, all = inN === n;
         return `<button class="opt ${all ? 'sel' : ''}" data-bg="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}${esc(gLabel(gid))}</div>
@@ -1084,6 +1107,7 @@
       }).join('')}</div>` : '<p class="hint">No groups yet. Make one above.</p>'}
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
+    wireFpSearch(box, focused);
     box.querySelector('#fpClose').onclick = () => closeTop();
     box.querySelector('#bpNewF').onclick = () => bulkNew('family');
     box.querySelector('#bpNewC').onclick = () => bulkNew('caste');
@@ -1554,6 +1578,8 @@
   // "Add to group" from a voter's details
   function showFamPick(vid, again) {
     const v = byId.get(vid), sk = v.surname, sn = sk && SURNAMES.get(sk);
+    if (!again) fpQ = '';
+    const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
     const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
     const curFam = familiesOf(vid);
     const rowP = gid => { const on = inGroup(gid, vid), mv = !on && gType(gid) === 'family' && curFam.length; return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
@@ -1561,12 +1587,14 @@
     $('#famPick').innerHTML = `<h2>Add to group</h2><p class="fam-sub">${esc(v.name)} · ${esc(v.name_en)}</p>
       ${curFam.length ? `<p class="hint">A voter can be in one family only. Choosing another family moves them out of ${esc(curFam.map(famName).join(', '))}.</p>` : ''}
       <div class="d-actions"><button class="btn primary" id="fpNewF">＋ New family</button><button class="btn primary" id="fpNewC">＋ New caste</button></div>
+      ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Add this person</h3><div class="picker-list fp-list">${list.map(rowP).join('')}</div>` : ''}
       ${list.length && sn ? `<h3>Add everyone named ${esc(sn.en)} (${sn.n})</h3><div class="fam-dd">${list.map(gid => FAM[gid].s[sk]
         ? `<button class="fam-chip" data-gs="${gid}">✓ ${esc(gLabel(gid))}</button>` : `<button class="fam-chip add" data-gs="${gid}">＋ ${esc(gLabel(gid))}</button>`).join('')}</div>
         <p class="hint">Adds the whole surname to the group, including people added to the roll later.</p>` : ''}
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
+    wireFpSearch(box, focused);
     box.querySelector('#fpClose').onclick = () => closeTop();
     // the name sheet opens on top; the new group then opens over this list, and Back comes back to it
     box.querySelector('#fpNewF').onclick = () => famCreate('family', vid);
