@@ -564,3 +564,11 @@ body.has-selbar main{padding-bottom:80px}
 .fam.acc .house-h{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .acc-chev{display:inline-block;font-style:normal;color:var(--muted);margin-right:6px;transition:transform .15s}
 .fam.acc.open .acc-chev{transform:rotate(90deg)}
+/* family accordion heading: head of the family's photo and name */
+.house-h.fh{justify-content:flex-start;gap:8px;padding:8px 10px}
+.house-h.fh .acc-chev{margin-right:0}
+.fh-ph{width:40px;height:48px;border-radius:8px;object-fit:cover;flex:none;background:var(--line)}
+.fh-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.fh-t b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fh-sub{font-style:normal;font-weight:500;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.house-h.fh small{flex:none}

@@ -1499,10 +1499,20 @@
   function famHTML(g) {
     const acc = g.t === 'family', isOpen = !acc || famExpanded.has(g.gid) || !!S.q.trim();
     const show = g.items.slice(0, acc ? 20 : 5), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
-    if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}"><div class="house-h" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="false"><span><i class="acc-chev">▸</i>${GT[g.t].icon} ${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
-      <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button></div></div>`;
-    return `<div class="house fam${acc ? ' acc open' : ''}"${acc ? ` data-acc-card="${g.gid}"` : ''}><div class="house-h" data-gk="${g.gid}"${acc ? ` data-acc="${g.gid}" role="button" aria-expanded="true"` : ''}><span>${acc ? '<i class="acc-chev">▸</i>' : ''}${GT[g.t].icon} ${esc(g.name)}${g.t === 'family' && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</span><small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
-      <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button></div>
+    const cnt = `<small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
+      <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button>`;
+    if (acc) {
+      // head of the family = the eldest member (as when families are named): their photo and name help tell families apart
+      const all = [...gMembers(g.gid).keys()].map(id => byId.get(id)).filter(Boolean), hv = all.length ? eldestOf(all) : null;
+      const head = `<div class="house-h fh" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="${isOpen}"><i class="acc-chev">▸</i>${hv ? photo(hv, 'fh-ph') : '<div class="ph fh-ph"></div>'}
+        <span class="fh-t"><b>${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${hv ? `<em class="fh-sub">${esc(hv.name_en || hv.name)}${hv.age ? `, ${hv.age}` : ''}</em>` : ''}</span>${cnt}</div>`;
+      if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}</div>`;
+      return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}
+      ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
+      ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
+      ${more > 0 ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
+    }
+    return `<div class="house fam"><div class="house-h" data-gk="${g.gid}"><span>${GT[g.t].icon} ${esc(g.name)}</span>${cnt}</div>
       ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
       ${show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
       ${more > 0 ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
