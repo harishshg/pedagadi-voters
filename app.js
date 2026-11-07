@@ -274,7 +274,7 @@
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
     if (S.caste !== 'all') $('#moreFilters').open = true;   // never hide a filter that is on
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
-    chips($('#statusChips'), [['all', 'Any'], ['ok', 'Active'], ['dead', '✝ Dead'], ['dup', '⧉ Duplicate'], ['gone', 'Not active']], S.vst, v => { S.vst = v; update(); });
+    chips($('#statusChips'), [['all', 'Any'], ['ok', 'Active'], ['dead', '✝ Dead'], ['dup', '⧉ Duplicate'], ['gone', 'Dead or duplicate']], S.vst, v => { S.vst = v; update(); });
     // quick ranges in one scrolling row; the slider shows (and sets) any range
     const AGES = [['all', 'Any'], ['18-25', '18–25'], ['26-35', '26–35'], ['36-45', '36–45'], ['46-59', '46–59'], ['60-', '60+'], ['unk', 'Not known']];
     chips($('#ageChips'), AGES, AGES.some(([v]) => v === S.age) ? S.age : '', v => { S.age = v; update(); });
