@@ -54,9 +54,10 @@
   // family groups made by the user: { gid: { name, v: { voterId: true } } } (synced with the sync code)
   const FAM = LS.get('pv_fam', {});
   Object.values(FAM).forEach(g => { g.t = g.t || 'family'; g.v = g.v || {}; g.s = g.s || {}; g.x = g.x || {}; });
-  const saveFam = () => LS.set('pv_fam', FAM);
+  let famRankCache = null;   // family-cluster order of all voters; rebuilt after any family change
+  const saveFam = () => { famRankCache = null; LS.set('pv_fam', FAM); };
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'size', nameOnly: false, frev: 'all', fsel: [], phone: 'all', vst: 'all', age: 'all' }, saved, { q: '' });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'family', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'size', nameOnly: false, frev: 'all', fsel: [], phone: 'all', vst: 'all', age: 'all' }, saved, { q: '' });
   if (S.view === 'family' && S.gtype === 'caste') S.view = 'caste';  // the old combined Groups tab
   if (saved.group) { if (((LS.get('pv_fam', {})[saved.group]) || {}).t === 'caste') S.cgrp = saved.group; else S.fgrp = saved.group; }
   // the Family filter: '' any, 'none' not in a family, 'sel' = one of the families in S.fsel (an old single family id becomes a selection)
@@ -65,8 +66,10 @@
   S.rel = 'all'; S.marked = false;  // relation and "only marked" filters were removed from the panel
   // "Most voters" became the default sort for Families / Castes: switch everyone over once (after that, their own choice is kept)
   if (!saved.gs2) S.gsort = 'size';
+  // "Family (together)" became the default voter order: switch everyone over once, like the sort above
+  if (!saved.fs2 && (!saved.sort || saved.sort === 'serial')) S.sort = 'family';
   const isGroupView = () => S.view === 'family' || S.view === 'caste';
-  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly, frev: S.frev, fsel: S.fsel, phone: S.phone, age: S.age, gs2: true });
+  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly, frev: S.frev, fsel: S.fsel, phone: S.phone, age: S.age, gs2: true, fs2: true });
   // surname index: standard spelling -> { te, en, n }
   const SURNAMES = new Map();
   V.forEach(v => { if (!v.surname) return; const s = SURNAMES.get(v.surname) || { te: v.surname, en: v.surname_en, n: 0 }; s.n++; SURNAMES.set(v.surname, s); });
@@ -139,9 +142,10 @@
     }
     const s = [...list];
     if (S.sort === 'name') s.sort((a, b) => a.name_en.localeCompare(b.name_en));
-    else if (S.sort === 'surname') s.sort((a, b) => (a.surname_en || '~').localeCompare(b.surname_en || '~') || a.name_en.localeCompare(b.name_en));
-    else if (S.sort === 'house') s.sort((a, b) => a.ward - b.ward || natural(a.house_no, b.house_no) || a.serial - b.serial);
-    else s.sort((a, b) => a.serial - b.serial);
+    else if (S.sort === 'surname') s.sort((a, b) => (a.surname_en || '~').localeCompare(b.surname_en || '~') || byFamily(a, b));
+    else if (S.sort === 'house') s.sort((a, b) => a.ward - b.ward || natural(a.house_no, b.house_no) || byFamily(a, b));
+    else if (S.sort === 'serial') s.sort((a, b) => a.serial - b.serial);
+    else s.sort(byFamily);
     return s;
   }
 
@@ -282,7 +286,7 @@
     chips($('#ageChips'), AGES, AGES.some(([v]) => v === S.age) ? S.age : '', v => { S.age = v; update(); });
     paintAge();
     chips($('#phoneChips'), [['all', 'Any'], ['has', '📞 Has a number'], ['none', 'No number']], S.phone, v => { S.phone = v; update(); });
-    chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
+    chips($('#sortChips'), [['family', 'Family (together)'], ['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
     document.querySelectorAll('#viewSeg button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view));
     // Houses and Marked live in the More menu; the More button shows which one is open
     const mb = $('#moreBtn'), inMore = S.view === 'house' || S.view === 'marked';
@@ -312,7 +316,7 @@
     if (S.phone !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="phone">${S.phone === 'has' ? '📞 Has a number' : 'No phone number'} <b>×</b></button>`);
     if (S.vst !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="vst">${{ ok: 'Active only', dead: '✝ Dead', dup: '⧉ Duplicate', gone: 'Dead or duplicate' }[S.vst]} <b>×</b></button>`);
     if (S.rel !== 'all' && S.view !== 'surnames') af.push(`<button class="af" data-clear="rel">${esc(S.rel)} <b>×</b></button>`);
-    if (S.sort !== 'serial' && (S.view === 'list' || S.view === 'marked')) af.push(`<button class="af" data-clear="sort">Sorted by ${{ name: 'name', surname: 'surname', house: 'house no.' }[S.sort] || S.sort} <b>×</b></button>`);
+    if (S.sort !== 'family' && (S.view === 'list' || S.view === 'marked')) af.push(`<button class="af" data-clear="sort">Sorted by ${{ serial: 'serial no.', name: 'name', surname: 'surname', house: 'house no.' }[S.sort] || S.sort} <b>×</b></button>`);
     if (S.ward) af.unshift(`<button class="af" data-clear="ward">Ward ${S.ward} <b>×</b></button>`);
     if (af.length > 1) af.unshift(`<button class="af clear-all" data-clear="all">Clear all</button>`);
     $('#activeFilters').innerHTML = af.length ? `<span class="af-lbl">Filters:</span>${af.join('')}` : '';
@@ -322,9 +326,9 @@
     const r = e.target.closest('[data-ffrm]'); if (r) { ffToggle(r.dataset.ffrm, false); return; }
     const b = e.target.closest('[data-clear]'); if (!b) return;
     const k = b.dataset.clear;
-    if (k === 'all') { Object.assign(S, { ward: 0, age: 'all', phone: 'all', vst: 'all', caste: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false }); update(); return; }
+    if (k === 'all') { Object.assign(S, { ward: 0, age: 'all', phone: 'all', vst: 'all', caste: 'all', rel: 'all', sort: 'family', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false }); update(); return; }
     if (k === 'ward') { S.ward = 0; update(); return; }
-    if (k === 'sort') { S.sort = 'serial'; update(); return; }
+    if (k === 'sort') { S.sort = 'family'; update(); return; }
     if (k === 'fgrp') S.fsel = []; S[k] = k === 'marked' ? false : ['surname', 'cgrp', 'fgrp'].includes(k) ? '' : 'all'; update();
   };
   function update() { saveState(); drawChips(); render(); window.scrollTo({ top: 0 }); if (selecting) drawSelBar(); }
@@ -459,7 +463,7 @@
   });
   $('#resetFilters').onclick = () => {
     if (S.view === 'surnames') { S.snf = 'all'; S.snsort = 'count'; }
-    else Object.assign(S, { caste: 'all', age: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'size' });
+    else Object.assign(S, { caste: 'all', age: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'family', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'size' });
     update();
   };
   // the sheet only shows what makes sense on the open tab
@@ -1496,6 +1500,23 @@
     if (vid) g.h = vid; else delete g.h;
     cloud.put('H', gid, vid || null); famChanged();
   }
+  // family clusters for big lists (voters, castes, surnames, wards): each family sits together where its first member
+  // appears in the roll, in the family's own order (head first, then the order set by hand); everyone else keeps roll order
+  function famRank() {
+    if (famRankCache) return famRankCache;
+    const r = new Map(), pos = v => v.ward * 100000 + v.serial;
+    Object.keys(FAM).forEach(gid => {
+      if (gType(gid) !== 'family') return;
+      const mem = [...gMembers(gid).keys()].map(id => byId.get(id)).filter(Boolean); if (!mem.length) return;
+      const a = Math.min(...mem.map(pos));
+      orderMembers(gid, mem).forEach((v, i) => { if (!r.has(v.id)) r.set(v.id, [a, i]); });
+    });
+    return (famRankCache = r);
+  }
+  function byFamily(a, b) {
+    const r = famRank(), x = r.get(a.id) || [a.ward * 100000 + a.serial, 0], y = r.get(b.id) || [b.ward * 100000 + b.serial, 0];
+    return x[0] - y[0] || x[1] - y[1];
+  }
   // order of members inside a family: head first, then the order set by hand (synced), then the rest by ward / serial
   function orderMembers(gid, vs) {
     const hd = gType(gid) === 'family' ? headOf(gid) : null, hid = hd && hd.v.id;
@@ -1528,7 +1549,7 @@
   function famHTML(g) {
     // families and castes both fold up to their heading (accordion); tap it to see the members. Searching opens them all.
     const fam = g.t === 'family', isOpen = famExpanded.has(g.gid) || !!S.q.trim();
-    const show = (fam ? orderMembers(g.gid, g.items) : g.items).slice(0, 20), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
+    const show = (fam ? orderMembers(g.gid, g.items) : [...g.items].sort(byFamily)).slice(0, 20), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
     const snTxt = sn.length ? `${sn.slice(0, 4).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 4 ? ` +${sn.length - 4}` : ''}` : '';
     const cnt = `<small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button>`;
@@ -2091,7 +2112,7 @@
       });
       if (JSON.stringify(g) !== JSON.stringify(FAM)) {
         Object.keys(FAM).forEach(k => delete FAM[k]); Object.assign(FAM, g); saveFam();
-        if (isGroupView() || S.view === 'surnames' || S.cgrp || S.fgrp) rerenderKeep();
+        rerenderKeep();   // the voter list's family order can change too
         drawChips();
         if (!$('#famSheet').hidden && $('#famSheet')._gid) { if (FAM[$('#famSheet')._gid]) showFam($('#famSheet')._gid, true); }
       }
