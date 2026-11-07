@@ -535,10 +535,6 @@ body.has-selbar main{padding-bottom:80px}
 .fp-search{margin:10px 0 4px}
 .fp-q{width:100%;box-sizing:border-box;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;font:inherit;font-size:16px;background:#fff;color:#15202b;outline:0}
 .fp-q:focus{border-color:var(--brand)}
-/* age filter: custom From / To range */
-.age-range{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
-.age-range input{width:84px;height:36px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:0 10px;font:inherit;font-size:16px;background:#fff;color:#15202b;outline:0}
-.age-range input:focus{border-color:var(--brand)}
 /* "More filters": rarely used filters, folded away */
 .more-f{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 .more-f>summary{list-style:none;cursor:pointer;font-size:14px;font-weight:700;color:var(--brand);padding:4px 0;display:flex;align-items:center;gap:6px}
@@ -546,4 +542,14 @@ body.has-selbar main{padding-bottom:80px}
 .more-f>summary::before{content:'▸';display:inline-block;transition:transform .15s}
 .more-f[open]>summary::before{transform:rotate(90deg)}
 .age-chips{padding-top:6px}
-.age-range[hidden]{display:none}
+/* age filter: two-handle slider */
+.age-h{display:flex;align-items:baseline;gap:8px}
+.age-h span{text-transform:none;letter-spacing:0;font-size:14px;color:var(--brand);font-weight:700}
+.age-slider{position:relative;height:32px;margin:4px 10px 0}
+.age-slider .trk{position:absolute;left:0;right:0;top:14px;height:4px;border-radius:2px;background:var(--line)}
+.age-slider .trk i{position:absolute;top:0;bottom:0;background:var(--brand);border-radius:2px}
+.age-slider input{position:absolute;left:-12px;right:-12px;top:0;width:calc(100% + 24px);height:32px;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none;z-index:1}
+.age-slider input::-webkit-slider-runnable-track{background:none;border:0}
+.age-slider input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer}
+.age-slider input::-moz-range-track{background:none;border:0}
+.age-slider input::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer}

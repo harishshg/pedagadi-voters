@@ -269,24 +269,16 @@
     el.innerHTML = items.map(([v, l]) => `<button class="chip ${v === val ? 'on' : ''}" data-v="${v}">${l}</button>`).join('');
     el.onclick = e => { const b = e.target.closest('.chip'); if (!b) return; onPick(b.dataset.v); };
   }
-  let ageCustomOpen = false;
   function drawChips() {
     const wards = [[0, 'All wards']].concat([...Array(10)].map((_, i) => [i + 1, `Ward ${i + 1}`]));
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
     if (S.caste !== 'all') $('#moreFilters').open = true;   // never hide a filter that is on
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
     chips($('#statusChips'), [['all', 'Any'], ['ok', 'Active only'], ['dead', '✝ Dead'], ['dup', '⧉ Duplicate'], ['gone', 'Dead or duplicate']], S.vst, v => { S.vst = v; update(); });
-    // one scrolling row of ranges; "Custom" opens the From / To boxes (kept open while a custom range is on)
+    // quick ranges in one scrolling row; the slider shows (and sets) any range
     const AGES = [['all', 'Any'], ['18-25', '18–25'], ['26-35', '26–35'], ['36-45', '36–45'], ['46-59', '46–59'], ['60-', '60+'], ['unk', 'Not known']];
-    const ageIsCustom = !AGES.some(([v]) => v === S.age);
-    if (!ageIsCustom && !ageCustomOpen) $('#ageRange').hidden = true;
-    if (ageIsCustom) $('#ageRange').hidden = false;
-    chips($('#ageChips'), [...AGES, ['custom', ageIsCustom ? ageLbl(S.age).replace('Age ', '') : 'Custom…']], ageIsCustom || !$('#ageRange').hidden ? 'custom' : S.age, v => {
-      if (v === 'custom') { ageCustomOpen = true; $('#ageRange').hidden = false; drawChips(); $('#ageMin').focus(); return; }
-      ageCustomOpen = false; S.age = v; update();
-    });
-    { const [lo, hi] = S.age === 'all' || S.age === 'unk' ? [null, null] : ageRange(S.age);
-      [['#ageMin', lo], ['#ageMax', hi]].forEach(([id, x]) => { const el = $(id); if (el && document.activeElement !== el) el.value = x == null ? '' : x; }); }
+    chips($('#ageChips'), AGES, AGES.some(([v]) => v === S.age) ? S.age : '', v => { S.age = v; update(); });
+    paintAge();
     chips($('#phoneChips'), [['all', 'Any'], ['has', '📞 Has a number'], ['none', 'No number']], S.phone, v => { S.phone = v; update(); });
     chips($('#sortChips'), [['serial', 'Serial no.'], ['name', 'Name (A–Z)'], ['surname', 'Surname (A–Z)'], ['house', 'House no.']], S.sort, v => { S.sort = v; update(); });
     document.querySelectorAll('#viewSeg button[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === S.view));
@@ -430,14 +422,28 @@
   });
   $('#filterBtn').onclick = () => { drawFilterSheet(); if (S.caste !== 'all') $('#moreFilters').open = true; openSheet('#filterSheet'); };
   $('#closeFilters').onclick = () => closeTop();
-  // custom age range: From / To boxes (either can be left empty)
+  // age slider: two handles on one track, 18 to 100 (100 = no upper limit)
+  const AGE_MIN = 18, AGE_MAX = 100;
+  function paintAge(lo, hi) {
+    if (lo == null) { const [a, b] = S.age === 'all' || S.age === 'unk' ? [null, null] : ageRange(S.age); lo = a == null ? AGE_MIN : a; hi = b == null ? AGE_MAX : b;
+      $('#ageLo').value = lo; $('#ageHi').value = hi; }
+    const pct = x => (x - AGE_MIN) / (AGE_MAX - AGE_MIN) * 100;
+    $('#ageFill').style.left = pct(lo) + '%'; $('#ageFill').style.right = (100 - pct(hi)) + '%';
+    $('#ageLo').style.zIndex = lo > AGE_MAX - 10 ? 3 : 1;   // so the left handle can still be pulled back when both sit at the right end
+    $('#ageVal').textContent = S.age === 'unk' && lo === AGE_MIN && hi === AGE_MAX ? 'Not known'
+      : lo === AGE_MIN && hi === AGE_MAX ? 'Any' : hi === AGE_MAX ? `${lo}+` : lo === AGE_MIN ? `up to ${hi}` : `${lo}–${hi}`;
+  }
   let ageT = 0;
-  ['#ageMin', '#ageMax'].forEach(id => $(id).oninput = () => { clearTimeout(ageT); ageT = setTimeout(() => {
-    const n = x => { const v = parseInt(x, 10); return v > 0 && v < 130 ? v : ''; };
-    let lo = n($('#ageMin').value), hi = n($('#ageMax').value);
-    if (lo !== '' && hi !== '' && lo > hi) [lo, hi] = [hi, lo];
-    S.age = lo === '' && hi === '' ? 'all' : `${lo}-${hi}`; update();
-  }, 400); });
+  ['#ageLo', '#ageHi'].forEach(id => $(id).oninput = e => {
+    let lo = +$('#ageLo').value, hi = +$('#ageHi').value;
+    if (lo > hi) { if (e.target.id === 'ageLo') lo = hi; else hi = lo; $('#ageLo').value = lo; $('#ageHi').value = hi; }
+    if (S.age === 'unk') S.age = 'all';
+    paintAge(lo, hi);
+    clearTimeout(ageT); ageT = setTimeout(() => {
+      S.age = lo === AGE_MIN && hi === AGE_MAX ? 'all' : `${lo === AGE_MIN ? '' : lo}-${hi === AGE_MAX ? '' : hi}`;
+      saveState(); drawChips(); render(); if (selecting) drawSelBar();
+    }, 150);
+  });
   $('#resetFilters').onclick = () => {
     if (S.view === 'surnames') { S.snf = 'all'; S.snsort = 'count'; }
     else Object.assign(S, { caste: 'all', age: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'name' });

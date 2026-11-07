@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=62">
+<link rel="stylesheet" href="style.css?v=63">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -75,9 +75,9 @@
       </div>
       <div id="fsCaste"></div>
       <div id="fsFamily"></div>
-      <h3>Age</h3>
+      <h3 class="age-h">Age <span id="ageVal">Any</span></h3>
+      <div class="age-slider"><div class="trk"><i id="ageFill"></i></div><input id="ageLo" type="range" min="18" max="100" step="1" value="18" aria-label="Youngest age"><input id="ageHi" type="range" min="18" max="100" step="1" value="100" aria-label="Oldest age"></div>
       <div class="chips age-chips" id="ageChips"></div>
-      <div class="age-range" id="ageRange" hidden><input id="ageMin" type="number" inputmode="numeric" min="18" max="120" placeholder="From" aria-label="Age from"><span>to</span><input id="ageMax" type="number" inputmode="numeric" min="18" max="120" placeholder="To" aria-label="Age to"></div>
       <h3>Phone number</h3>
       <div class="chips wrap" id="phoneChips"></div>
       <h3>Status</h3>
@@ -311,6 +311,6 @@
 <button id="updBar" class="upd-bar" hidden>✨ New version ready · <b>Tap to update</b></button>
 
 <script src="data.js?v=57"></script>
-<script src="app.js?v=62"></script>
+<script src="app.js?v=63"></script>
 </body>
 </html>
