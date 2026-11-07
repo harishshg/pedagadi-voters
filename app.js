@@ -56,15 +56,17 @@
   Object.values(FAM).forEach(g => { g.t = g.t || 'family'; g.v = g.v || {}; g.s = g.s || {}; g.x = g.x || {}; });
   const saveFam = () => LS.set('pv_fam', FAM);
   const saved = LS.get('pv_state', {});
-  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'name', nameOnly: false, frev: 'all', fsel: [], phone: 'all', vst: 'all', age: 'all' }, saved, { q: '' });
+  const S = Object.assign({ q: '', ward: 0, caste: 'all', rel: 'all', sort: 'serial', view: 'list', surname: '', group: '', gtype: 'all', snf: 'all', snsort: 'count', cgrp: '', fgrp: '', marked: false, gsort: 'size', nameOnly: false, frev: 'all', fsel: [], phone: 'all', vst: 'all', age: 'all' }, saved, { q: '' });
   if (S.view === 'family' && S.gtype === 'caste') S.view = 'caste';  // the old combined Groups tab
   if (saved.group) { if (((LS.get('pv_fam', {})[saved.group]) || {}).t === 'caste') S.cgrp = saved.group; else S.fgrp = saved.group; }
   // the Family filter: '' any, 'none' not in a family, 'sel' = one of the families in S.fsel (an old single family id becomes a selection)
   if (!Array.isArray(S.fsel)) S.fsel = [];
   if (S.fgrp && S.fgrp !== 'none' && S.fgrp !== 'sel') { S.fsel = [S.fgrp]; S.fgrp = 'sel'; }
   S.rel = 'all'; S.marked = false;  // relation and "only marked" filters were removed from the panel
+  // "Most voters" became the default sort for Families / Castes: switch everyone over once (after that, their own choice is kept)
+  if (!saved.gs2) S.gsort = 'size';
   const isGroupView = () => S.view === 'family' || S.view === 'caste';
-  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly, frev: S.frev, fsel: S.fsel, phone: S.phone, age: S.age });
+  const saveState = () => LS.set('pv_state', { ward: S.ward, caste: S.caste, rel: S.rel, sort: S.sort, view: S.view, surname: S.surname, cgrp: S.cgrp, fgrp: S.fgrp, marked: S.marked, gsort: S.gsort, snf: S.snf, snsort: S.snsort, nameOnly: S.nameOnly, frev: S.frev, fsel: S.fsel, phone: S.phone, age: S.age, gs2: true });
   // surname index: standard spelling -> { te, en, n }
   const SURNAMES = new Map();
   V.forEach(v => { if (!v.surname) return; const s = SURNAMES.get(v.surname) || { te: v.surname, en: v.surname_en, n: 0 }; s.n++; SURNAMES.set(v.surname, s); });
@@ -457,7 +459,7 @@
   });
   $('#resetFilters').onclick = () => {
     if (S.view === 'surnames') { S.snf = 'all'; S.snsort = 'count'; }
-    else Object.assign(S, { caste: 'all', age: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'name' });
+    else Object.assign(S, { caste: 'all', age: 'all', phone: 'all', vst: 'all', rel: 'all', sort: 'serial', surname: '', cgrp: '', fgrp: '', fsel: [], marked: false, gsort: 'size' });
     update();
   };
   // the sheet only shows what makes sense on the open tab
@@ -472,7 +474,7 @@
       ${castes.length ? `<h3>In caste</h3>${chipRow('snf', castes.map(gid => [gid, '🏷️ ' + esc(famName(gid))]), S.snf)}` : ''}
       <h3>Sort by</h3>${chipRow('snsort', [['count', 'Most voters'], ['az', 'A–Z']], S.snsort)}
       <p class="hint">Use the ward chips at the top to see one ward’s surnames.</p>` : '';
-    $('#fsGroupSort').innerHTML = isG ? `<h3>Sort ${GT[v].plural.toLowerCase()} by</h3>${chipRow('gsort', [['name', 'Name (A–Z)'], ['size', 'Most voters']], S.gsort)}
+    $('#fsGroupSort').innerHTML = isG ? `<h3>Sort ${GT[v].plural.toLowerCase()} by</h3>${chipRow('gsort', [['size', 'Most voters'], ['name', 'Name (A–Z)']], S.gsort)}
       <p class="hint">The filters below narrow down the people shown in each ${GT[v].label.toLowerCase()}.</p>` : '';
     // castes with the most voters first, each chip showing its count (whole village)
     const inCaste = new Set(), cN = new Map(castes.map(gid => { const m = gMembers(gid); m.forEach((_, id) => inCaste.add(id)); return [gid, m.size]; }));
