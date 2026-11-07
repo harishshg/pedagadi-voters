@@ -1171,7 +1171,7 @@
     const ids = [...sel], n = ids.length;
     if (!again) fpQ = '';
     const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
-    const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
+    const list = Object.keys(FAM).sort((a, b) => (gType(a) === 'caste') - (gType(b) === 'caste') || famName(a).localeCompare(famName(b)));
     $('#famPick').innerHTML = `<h2>Add ${n} voter${n === 1 ? '' : 's'} to a group</h2>
       ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Your groups</h3><div class="picker-list fp-list">${list.map(gid => {
@@ -1763,7 +1763,7 @@
     if (!again) fpQ = '';
     const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
     // the voter's own groups first, then the rest by type and name
-    const list = Object.keys(FAM).sort((a, b) => inGroup(b, vid) - inGroup(a, vid) || gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
+    const list = Object.keys(FAM).sort((a, b) => inGroup(b, vid) - inGroup(a, vid) || (gType(a) === 'caste') - (gType(b) === 'caste') || famName(a).localeCompare(famName(b)));
     const curFam = familiesOf(vid);
     const castesL = list.filter(gid => gType(gid) === 'caste');   // whole-surname adding is for castes only (it added people to families by accident)
     const rowP = gid => { const on = inGroup(gid, vid), mv = !on && gType(gid) === 'family' && curFam.length; return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
