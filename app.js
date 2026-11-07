@@ -474,7 +474,10 @@
       <p class="hint">Use the ward chips at the top to see one ward’s surnames.</p>` : '';
     $('#fsGroupSort').innerHTML = isG ? `<h3>Sort ${GT[v].plural.toLowerCase()} by</h3>${chipRow('gsort', [['name', 'Name (A–Z)'], ['size', 'Most voters']], S.gsort)}
       <p class="hint">The filters below narrow down the people shown in each ${GT[v].label.toLowerCase()}.</p>` : '';
-    $('#fsCaste').innerHTML = castes.length && v !== 'caste' ? `<h3>Caste group</h3>${chipRow('cgrp', [['', 'Any'], ['none', 'Not in a caste'], ...castes.map(gid => [gid, '🏷️ ' + esc(famName(gid))])], S.cgrp)}` : '';
+    // castes with the most voters first, each chip showing its count (whole village)
+    const cN = new Map(castes.map(gid => [gid, gMembers(gid).size]));
+    const byN = [...castes].sort((a, b) => cN.get(b) - cN.get(a) || famName(a).localeCompare(famName(b)));
+    $('#fsCaste').innerHTML = castes.length && v !== 'caste' ? `<h3>Caste group</h3>${chipRow('cgrp', [['', 'Any'], ['none', 'Not in a caste'], ...byN.map(gid => [gid, `🏷️ ${esc(famName(gid))} <small class="c-n">${cN.get(gid).toLocaleString()}</small>`])], S.cgrp)}` : '';
     const fs = S.fgrp === 'sel' ? S.fsel.filter(gid => FAM[gid]) : [];
     $('#fsFamily').innerHTML = fams.length && v !== 'family' ? `<h3>Family</h3><div class="chips wrap">
         <button class="chip ${!S.fgrp ? 'on' : ''}" data-fk="fgrp" data-fv="">Any</button>
