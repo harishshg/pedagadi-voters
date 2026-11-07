@@ -625,13 +625,28 @@
       + (left ? ` · ${left} dead / duplicate left out` : '') + (vs.length === 1 && isGone(vs[0].id) ? ` · marked ${statusOf(vs[0].id).k === 'dead' ? 'dead' : 'duplicate'}` : '');
     const prev = $('#slipPrev'), imgBtn = $('#slipImg');
     prev.innerHTML = '<p class="hint" style="margin:8px">Making the slip…</p>'; imgBtn.disabled = true;
-    const txt = slipText(vs, title);
+    const slipTxt = slipText(vs, title);
+    // what the WhatsApp text buttons send: the slip details, or your own message ({name} = the voter's name)
+    const msgFor = v => {
+      if (LS.get('pv_msgmode', 'slip') !== 'msg') return slipTxt;
+      const nm = v ? firstName(v) : vs.length === 1 ? firstName(vs[0]) : '';
+      return (LS.get('pv_msg', 'Hi {name}') || '').replace(/\{name\}/gi, nm).replace(/[ \t]+([,.!])/g, '$1').replace(/[ \t]{2,}/g, ' ').trim();
+    };
+    const drawMsg = () => {
+      const m = LS.get('pv_msgmode', 'slip');
+      $('#msgMode').querySelectorAll('[data-mm]').forEach(b => b.classList.toggle('on', b.dataset.mm === m));
+      $('#msgTxt').hidden = $('#msgHint').hidden = m !== 'msg';
+    };
+    $('#msgTxt').value = LS.get('pv_msg', 'Hi {name}');
+    $('#msgTxt').oninput = () => LS.set('pv_msg', $('#msgTxt').value);
+    $('#msgMode').onclick = e => { const b = e.target.closest('[data-mm]'); if (!b) return; LS.set('pv_msgmode', b.dataset.mm); drawMsg(); if (b.dataset.mm === 'msg') $('#msgTxt').focus(); };
+    drawMsg();
     // WhatsApp text: to anyone, or straight to a saved number of these voters
-    const nums = [...new Map(vs.flatMap(v => phonesOf(v.id).map(p => [p, v]))).entries()].slice(0, 6);
+    const byNum = new Map(vs.flatMap(v => phonesOf(v.id).map(p => [p, v]))), nums = [...byNum.entries()].slice(0, 6);
     $('#slipTo').className = 'slip-to';
     $('#slipTo').innerHTML = nums.map(([p, v]) => `<button type="button" class="btn wa-out" data-wa-to="${p}">Text to ${esc(fmtPhone(p))}${vs.length > 1 ? ` <small>(${esc(firstName(v))})</small>` : ''}</button>`).join('');
-    $('#slipTo').querySelectorAll('[data-wa-to]').forEach(b => b.onclick = () => window.open(`https://wa.me/91${b.dataset.waTo}?text=${encodeURIComponent(txt)}`, '_blank'));
-    $('#slipTxt').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+    $('#slipTo').querySelectorAll('[data-wa-to]').forEach(b => b.onclick = () => window.open(`https://wa.me/91${b.dataset.waTo}?text=${encodeURIComponent(msgFor(byNum.get(b.dataset.waTo)))}`, '_blank'));
+    $('#slipTxt').onclick = () => window.open('https://wa.me/?text=' + encodeURIComponent(msgFor()), '_blank');
     $('#slipClose').onclick = () => closeTop();
     if (!raise('#slipSheet')) openSheet('#slipSheet');
     $('#slipSheet')._onClose = () => stopVoice(true);
