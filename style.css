@@ -545,3 +545,5 @@ body.has-selbar main{padding-bottom:80px}
 .more-f>summary::-webkit-details-marker{display:none}
 .more-f>summary::before{content:'▸';display:inline-block;transition:transform .15s}
 .more-f[open]>summary::before{transform:rotate(90deg)}
+.age-chips{padding-top:6px}
+.age-range[hidden]{display:none}

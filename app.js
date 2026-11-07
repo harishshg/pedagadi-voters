@@ -269,13 +269,22 @@
     el.innerHTML = items.map(([v, l]) => `<button class="chip ${v === val ? 'on' : ''}" data-v="${v}">${l}</button>`).join('');
     el.onclick = e => { const b = e.target.closest('.chip'); if (!b) return; onPick(b.dataset.v); };
   }
+  let ageCustomOpen = false;
   function drawChips() {
     const wards = [[0, 'All wards']].concat([...Array(10)].map((_, i) => [i + 1, `Ward ${i + 1}`]));
     chips($('#wardChips'), wards, S.ward, v => { S.ward = +v; update(); });
     if (S.caste !== 'all') $('#moreFilters').open = true;   // never hide a filter that is on
     chips($('#casteChips'), [['all', 'All'], ['BC', 'BC'], ['SC', 'SC'], ['ST', 'ST'], ['Not specified', 'Not specified']], S.caste, v => { S.caste = v; update(); });
     chips($('#statusChips'), [['all', 'Any'], ['ok', 'Active only'], ['dead', '✝ Dead'], ['dup', '⧉ Duplicate'], ['gone', 'Dead or duplicate']], S.vst, v => { S.vst = v; update(); });
-    chips($('#ageChips'), [['all', 'Any'], ['18-25', '18–25'], ['26-35', '26–35'], ['36-45', '36–45'], ['46-59', '46–59'], ['60-', '60+'], ['unk', 'Not known']], S.age, v => { S.age = v; update(); });
+    // one scrolling row of ranges; "Custom" opens the From / To boxes (kept open while a custom range is on)
+    const AGES = [['all', 'Any'], ['18-25', '18–25'], ['26-35', '26–35'], ['36-45', '36–45'], ['46-59', '46–59'], ['60-', '60+'], ['unk', 'Not known']];
+    const ageIsCustom = !AGES.some(([v]) => v === S.age);
+    if (!ageIsCustom && !ageCustomOpen) $('#ageRange').hidden = true;
+    if (ageIsCustom) $('#ageRange').hidden = false;
+    chips($('#ageChips'), [...AGES, ['custom', ageIsCustom ? ageLbl(S.age).replace('Age ', '') : 'Custom…']], ageIsCustom || !$('#ageRange').hidden ? 'custom' : S.age, v => {
+      if (v === 'custom') { ageCustomOpen = true; $('#ageRange').hidden = false; drawChips(); $('#ageMin').focus(); return; }
+      ageCustomOpen = false; S.age = v; update();
+    });
     { const [lo, hi] = S.age === 'all' || S.age === 'unk' ? [null, null] : ageRange(S.age);
       [['#ageMin', lo], ['#ageMax', hi]].forEach(([id, x]) => { const el = $(id); if (el && document.activeElement !== el) el.value = x == null ? '' : x; }); }
     chips($('#phoneChips'), [['all', 'Any'], ['has', '📞 Has a number'], ['none', 'No number']], S.phone, v => { S.phone = v; update(); });
