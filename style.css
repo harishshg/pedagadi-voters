@@ -572,3 +572,7 @@ body.has-selbar main{padding-bottom:80px}
 .fh-t b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fh-sub{font-style:normal;font-weight:500;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .house-h.fh small{flex:none}
+/* head of the family: 👑 button in the family sheet */
+.fam-act.head{font-size:18px;filter:grayscale(1);opacity:.35}
+.fam-act.head.on{filter:none;opacity:1;background:var(--accent)}
+.head-tag{color:var(--brand);font-weight:700}

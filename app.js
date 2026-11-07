@@ -1482,6 +1482,18 @@
     if (on) g.r = cloud.myName || ''; else delete g.r;
     cloud.put('R', gid, on ? g.r : null); famChanged();
   }
+  // head of the family: the member chosen with 👑 in the family sheet (synced), otherwise the eldest member
+  function headOf(gid) {
+    const g = FAM[gid]; if (!g) return null;
+    if (g.h && inGroup(gid, g.h) && byId.has(g.h)) return { v: byId.get(g.h), chosen: true };
+    const all = [...gMembers(gid).keys()].map(id => byId.get(id)).filter(Boolean);
+    return all.length ? { v: eldestOf(all), chosen: false } : null;
+  }
+  function setHead(gid, vid) {
+    const g = FAM[gid]; if (!g) return;
+    if (vid) g.h = vid; else delete g.h;
+    cloud.put('H', gid, vid || null); famChanged();
+  }
   function famGroups(t, allReview) {
     return famGroupsAll(t).filter(g => allReview || t !== 'family' || S.frev === 'all' || (S.frev === 'done') === isReviewed(g.gid));
   }
@@ -1502,10 +1514,10 @@
     const cnt = `<small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button>`;
     if (acc) {
-      // head of the family = the eldest member (as when families are named): their photo and name help tell families apart
-      const all = [...gMembers(g.gid).keys()].map(id => byId.get(id)).filter(Boolean), hv = all.length ? eldestOf(all) : null;
+      // head of the family (chosen with 👑, else the eldest member): their photo and name help tell families apart
+      const hd = headOf(g.gid), hv = hd && hd.v;
       const head = `<div class="house-h fh" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="${isOpen}"><i class="acc-chev">▸</i>${hv ? photo(hv, 'fh-ph') : '<div class="ph fh-ph"></div>'}
-        <span class="fh-t"><b>${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${hv ? `<em class="fh-sub">${esc(hv.name_en || hv.name)}${hv.age ? `, ${hv.age}` : ''}</em>` : ''}</span>${cnt}</div>`;
+        <span class="fh-t"><b>${esc(g.name)}${isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${hv ? `<em class="fh-sub">${hd.chosen ? '👑 ' : ''}${esc(hv.name_en || hv.name)}${hv.age ? `, ${hv.age}` : ''}</em>` : ''}</span>${cnt}</div>`;
       if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}</div>`;
       return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}
       ${sn.length ? `<div class="g-sn">Surnames: ${sn.slice(0, 6).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 6 ? ` +${sn.length - 6}` : ''}</div>` : ''}
@@ -1588,7 +1600,8 @@
     if (!FAM[gid]) { toast('This group was deleted'); return; }
     const g = FAM[gid], t = gType(gid); $('#famSheet')._gid = gid;
     const memMap = gMembers(gid);
-    const mem = [...memMap.keys()].map(id => byId.get(id)).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
+    const hd = t === 'family' ? headOf(gid) : null, hid = hd && hd.v.id;
+    const mem = [...memMap.keys()].map(id => byId.get(id)).sort((a, b) => (b.id === hid) - (a.id === hid) || a.ward - b.ward || a.serial - b.serial);
     const wards = {}; mem.forEach(v => wards[v.ward] = (wards[v.ward] || 0) + 1);
     const sn = Object.keys(g.s), xs = Object.keys(g.x).map(id => byId.get(id)).filter(Boolean);
     const sug = t === 'family' ? suggest(gid, memMap) : [];
@@ -1609,8 +1622,9 @@
       <p class="hint">${sn.length ? 'Everyone with these surnames is in the group.' : 'Add a surname to include everyone with it — useful for castes.'}</p>
       ${sugSn.length ? `<div class="fam-dd sugg">${sugSn.map(k => `<button class="fam-chip add" data-sn-add="${esc(k)}">＋ ${esc(snLabel(k))} (${SURNAMES.get(k) ? SURNAMES.get(k).n : ''})</button>`).join('')}</div><p class="hint">Surnames of people already in the group.</p>` : ''}
       <h3>Members (${mem.length.toLocaleString()})</h3>
-      ${mem.length ? `<div class="house">${mem.slice(0, LIMIT).map(v => row(v, `${memMap.get(v.id) === 'surname' ? '<span class="why">via surname</span> · ' : ''}${esc(v.relation)}: ${esc(v.relation_name_en || '—')}`,
-        `<button class="fam-act rm" data-rm="${v.id}" aria-label="Take ${esc(v.name_en)} out">×</button>`)).join('')}</div>
+      ${t === 'family' && mem.length ? `<p class="hint">Tap 👑 to choose the head of the family.${hd && !hd.chosen ? ' Until then the eldest member is shown as head.' : ''}</p>` : ''}
+      ${mem.length ? `<div class="house">${mem.slice(0, LIMIT).map(v => row(v, `${v.id === hid ? `<b class="head-tag">👑 Head${hd.chosen ? '' : ' (eldest)'}</b> · ` : ''}${memMap.get(v.id) === 'surname' ? '<span class="why">via surname</span> · ' : ''}${esc(v.relation)}: ${esc(v.relation_name_en || '—')}`,
+        `${t === 'family' ? `<button class="fam-act head${v.id === hid && hd.chosen ? ' on' : ''}" data-head="${v.id}" aria-label="${v.id === hid && hd.chosen ? 'Unset head' : `Make ${esc(v.name_en)} head of the family`}">👑</button>` : ''}<button class="fam-act rm" data-rm="${v.id}" aria-label="Take ${esc(v.name_en)} out">×</button>`)).join('')}</div>
         ${mem.length > LIMIT ? `<button class="btn w100" id="fShow2" style="margin-top:8px">Show all ${mem.length.toLocaleString()} in the voter list</button>` : ''}`
         : '<p class="hint">No voters yet. Add a surname above, or open any voter and tap “Add to group”.</p>'}
       ${xs.length ? `<h3>Taken out (${xs.length})</h3><div class="house">${xs.map(v => row(v, 'has a group surname but is not in the group', `<button class="fam-act add" data-readd="${v.id}" aria-label="Put back">＋</button>`)).join('')}</div>` : ''}
@@ -1645,6 +1659,10 @@
     box.querySelectorAll('[data-sn-rm]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snRm, false); showFam(gid, true); });
     box.querySelectorAll('[data-sn-add]').forEach(b => b.onclick = () => { gSurname(gid, b.dataset.snAdd, true); toast('Surname added'); showFam(gid, true); });
     box.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { gRemoveVoter(gid, b.dataset.rm); showFam(gid, true); });
+    box.querySelectorAll('[data-head]').forEach(b => b.onclick = () => {
+      const vid = b.dataset.head, v = byId.get(vid), unset = g.h === vid;
+      setHead(gid, unset ? null : vid); toast(unset ? 'Head of the family cleared' : `${v ? v.name_en || v.name : 'This voter'} is now head of the family`); showFam(gid, true);
+    });
     box.querySelectorAll('[data-readd]').forEach(b => b.onclick = () => { const from = gAddVoter(gid, b.dataset.readd); if (from.length) toast(addedMsg(gid, from)); showFam(gid, true); });
     box.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { toast(addedMsg(gid, gAddVoter(gid, b.dataset.add))); showFam(gid, true); });
     box.querySelectorAll('[data-open]').forEach(b => b.onclick = () => showDetail(b.dataset.open));
@@ -1892,7 +1910,7 @@
     put(type, id, val) {
       if (!this.code) return;
       // deleting a family group drops any member changes for it that are still waiting
-      if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TRVSX]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
+      if (type === 'G' && val === null) Object.keys(this.q).forEach(k => { if (/^[TRVSXH]:/.test(k) && k.slice(2).split('|')[0] === id) delete this.q[k]; });
       this.q[type + ':' + id] = val; if (!this.hold) LS.set('pv_sync_q', this.q);
       if (type === 'm' || type === 'n') {
         if (val === null) delete this.who[type + ':' + id]; else this.who[type + ':' + id] = { by: this.myName, d: this.dev, t: Date.now() };
@@ -1913,11 +1931,12 @@
         const mask = part.flatMap(k => {
           const [t, id] = [k[0], k.slice(2)], val = this.q[k]; sent[k] = val;
           // groups: g.<gid>.name, g.<gid>.t, and g.<gid>.v / .s / .x .<key> (voters, surnames, taken out)
-          if ('GTRVSX'.includes(t)) {
+          if ('GTRVSXH'.includes(t)) {
             const [gid, key] = id.split('|'), gf = body.fields.g.mapValue.fields;
             if (t === 'G' && val === null) return [path(['g', gid])];
             const grp = gf[gid] || (gf[gid] = { mapValue: { fields: { v: F(), s: F(), x: F() } } });
             if (t === 'R') { if (val !== null) grp.mapValue.fields.r = { stringValue: String(val) }; return [path(['g', gid, 'r'])]; }
+            if (t === 'H') { if (val !== null) grp.mapValue.fields.h = { stringValue: String(val) }; return [path(['g', gid, 'h'])]; }
             if (t === 'G' || t === 'T') { const f = t === 'G' ? 'name' : 't'; grp.mapValue.fields[f] = { stringValue: String(val) }; return [path(['g', gid, f])]; }
             const f = t.toLowerCase();
             if (val !== null) grp.mapValue.fields[f].mapValue.fields[key] = { booleanValue: true };
@@ -1960,6 +1979,7 @@
         const set = k => { const o = {}; Object.entries((gf[k] && gf[k].mapValue && gf[k].mapValue.fields) || {}).forEach(([id, b]) => { if (b.booleanValue) o[id] = true; }); return o; };
         g[gid] = { name: (gf.name && gf.name.stringValue) || '', t: (gf.t && gf.t.stringValue) || 'family', v: set('v'), s: set('s'), x: set('x') };
         if (gf.r && typeof gf.r.stringValue === 'string') g[gid].r = gf.r.stringValue;
+        if (gf.h && gf.h.stringValue) g[gid].h = gf.h.stringValue;
       });
       return { m: (f.m && f.m.mapValue.fields) || {}, n: (f.n && f.n.mapValue.fields) || {}, name: str('name'), owner: str('owner'), p, who, g };
     },
@@ -2022,12 +2042,13 @@
       // family groups: cloud copy + changes still waiting to be sent
       const g = JSON.parse(JSON.stringify(d.g || {}));
       Object.entries(this.q).forEach(([k, val]) => {
-        const t = k[0]; if (!'GTRVSX'.includes(t)) return;
+        const t = k[0]; if (!'GTRVSXH'.includes(t)) return;
         const [gid, key] = k.slice(2).split('|');
         if (t === 'G' && val === null) { delete g[gid]; return; }
         const grp = g[gid] = g[gid] || { name: '', t: 'family', v: {}, s: {}, x: {} };
         if (t === 'G') grp.name = val; else if (t === 'T') grp.t = val;
         else if (t === 'R') { if (val === null) delete grp.r; else grp.r = val; }
+        else if (t === 'H') { if (val === null) delete grp.h; else grp.h = val; }
         else { const f = t.toLowerCase(); if (val) grp[f][key] = true; else delete grp[f][key]; }
       });
       if (JSON.stringify(g) !== JSON.stringify(FAM)) {
