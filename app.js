@@ -1171,13 +1171,13 @@
     const ids = [...sel], n = ids.length;
     if (!again) fpQ = '';
     const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
-    const list = Object.keys(FAM).sort((a, b) => (gType(a) === 'caste') - (gType(b) === 'caste') || famName(a).localeCompare(famName(b)));
+    const list = Object.keys(FAM).sort((a, b) => recentRank(a) - recentRank(b) || (gType(a) === 'caste') - (gType(b) === 'caste') || famName(a).localeCompare(famName(b)));
     $('#famPick').innerHTML = `<h2>Add ${n} voter${n === 1 ? '' : 's'} to a group</h2>
       ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Your groups</h3><div class="picker-list fp-list">${list.map(gid => {
         const inN = ids.filter(id => inGroup(gid, id)).length, all = inN === n;
         return `<button class="opt ${all ? 'sel' : ''}" data-bg="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}${esc(gLabel(gid))}</div>
-          <div class="o-en">${GT[gType(gid)].label} · ${inN ? `${inN} of ${n} already in` : `${gMembers(gid).size} voters`}</div></div><span class="o-n">${all ? 'Remove' : `Add ${n - inN}`}</span></button>`;
+          <div class="o-en">${recentRank(gid) < 99 ? '<b class="recent">🕘 Recent</b> · ' : ''}${GT[gType(gid)].label} · ${inN ? `${inN} of ${n} already in` : `${gMembers(gid).size} voters`}</div></div><span class="o-n">${all ? 'Remove' : `Add ${n - inN}`}</span></button>`;
       }).join('')}</div>` : '<p class="hint">No groups yet. Make one below.</p>'}
       <div class="d-actions fp-new"><button class="btn" id="bpNewF">＋ New family</button><button class="btn" id="bpNewC">＋ New caste</button></div>
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
@@ -1306,7 +1306,12 @@
     return familiesOf(vid, gid).map(o => { gSet(o, 'v', vid, false); if (v && v.surname && FAM[o].s[v.surname]) gSet(o, 'x', vid, true); return o; });
   }
   let lastMoved = 0;
+  // groups this phone added people to most recently (newest first): shown at the top of "Add to group"
+  let recentG = LS.get('pv_recent_g', []);
+  function touchRecent(gid) { recentG = [gid, ...recentG.filter(x => x !== gid && FAM[x])].slice(0, 5); LS.set('pv_recent_g', recentG); }
+  const recentRank = gid => { const i = recentG.indexOf(gid); return i < 0 ? 99 : i; };
   function gAddMany(gid, ids) {
+    touchRecent(gid);
     let n = 0; lastMoved = 0;
     ids.forEach(vid => { if (inGroup(gid, vid)) return; n++; if (leaveOtherFamilies(gid, vid).length) lastMoved++; gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); });
     famChanged(); return n;
@@ -1315,7 +1320,7 @@
     ids.forEach(vid => { const v = byId.get(vid); gSet(gid, 'v', vid, false); if (v && v.surname && FAM[gid].s[v.surname]) gSet(gid, 'x', vid, true); });
     famChanged();
   }
-  function gAddVoter(gid, vid) { const from = leaveOtherFamilies(gid, vid).map(famName); gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); famChanged(); return from; }
+  function gAddVoter(gid, vid) { touchRecent(gid); const from = leaveOtherFamilies(gid, vid).map(famName); gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); famChanged(); return from; }
   // toast text for adding one voter: says where they moved from
   const addedMsg = (gid, from) => from.length ? `Moved from ${from.join(', ')} to ${famName(gid)}` : `Added to ${famName(gid)}`;
   function gRemoveVoter(gid, vid) {
@@ -1762,12 +1767,12 @@
     const v = byId.get(vid), sk = v.surname, sn = sk && SURNAMES.get(sk);
     if (!again) fpQ = '';
     const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
-    // the voter's own groups first, then the rest by type and name
-    const list = Object.keys(FAM).sort((a, b) => inGroup(b, vid) - inGroup(a, vid) || (gType(a) === 'caste') - (gType(b) === 'caste') || famName(a).localeCompare(famName(b)));
+    // the voter's own groups first, then the ones used most recently, then families, then castes
+    const list = Object.keys(FAM).sort((a, b) => inGroup(b, vid) - inGroup(a, vid) || recentRank(a) - recentRank(b) || (gType(a) === 'caste') - (gType(b) === 'caste') || famName(a).localeCompare(famName(b)));
     const curFam = familiesOf(vid);
     const castesL = list.filter(gid => gType(gid) === 'caste');   // whole-surname adding is for castes only (it added people to families by accident)
     const rowP = gid => { const on = inGroup(gid, vid), mv = !on && gType(gid) === 'family' && curFam.length; return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
-      <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : mv ? 'Move here' : 'Add'}</span></button>`; };
+      <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${!on && recentRank(gid) < 99 ? '<b class="recent">🕘 Recent</b> · ' : ''}${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : mv ? 'Move here' : 'Add'}</span></button>`; };
     $('#famPick').innerHTML = `<h2>Add to group</h2><p class="fam-sub">${esc(v.name)} · ${esc(v.name_en)}</p>
       ${curFam.length ? `<p class="hint">A voter can be in one family only. Choosing another family moves them out of ${esc(curFam.map(famName).join(', '))}.</p>` : ''}
       ${fpSearchHTML(list.length)}
