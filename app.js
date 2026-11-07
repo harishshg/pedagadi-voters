@@ -461,7 +461,7 @@
     update();
   };
   // the sheet only shows what makes sense on the open tab
-  const chipRow = (k, items, val, cls = 'wrap') => `<div class="chips ${cls}">${items.map(([v, l]) => `<button class="chip ${String(v) === String(val) ? 'on' : ''}" data-fk="${k}" data-fv="${esc(v)}">${l}</button>`).join('')}</div>`;
+  const chipRow = (k, items, val) => `<div class="chips wrap">${items.map(([v, l]) => `<button class="chip ${String(v) === String(val) ? 'on' : ''}" data-fk="${k}" data-fv="${esc(v)}">${l}</button>`).join('')}</div>`;
   function drawFilterSheet() {
     const v = S.view, isSn = v === 'surnames', isG = isGroupView();
     const castes = Object.keys(FAM).filter(gid => gType(gid) === 'caste').sort((a, b) => famName(a).localeCompare(famName(b)));
@@ -474,10 +474,7 @@
       <p class="hint">Use the ward chips at the top to see one ward’s surnames.</p>` : '';
     $('#fsGroupSort').innerHTML = isG ? `<h3>Sort ${GT[v].plural.toLowerCase()} by</h3>${chipRow('gsort', [['name', 'Name (A–Z)'], ['size', 'Most voters']], S.gsort)}
       <p class="hint">The filters below narrow down the people shown in each ${GT[v].label.toLowerCase()}.</p>` : '';
-    $('#fsCaste').innerHTML = castes.length && v !== 'caste' ? `<h3>Caste group</h3>${chipRow('cgrp', [['', 'Any'], ['none', 'Not in a caste'], ...castes.map(gid => [gid, '🏷️ ' + esc(famName(gid))])], S.cgrp, 'age-chips')}` : '';
-    // one swipeable row: bring the chosen caste into view so an active filter is never hidden off to the side
-    { const on = $('#fsCaste .chip.on'), row = on && on.parentElement;   // sideways only: never moves the sheet itself
-      if (on && S.cgrp) requestAnimationFrame(() => { const r = row.getBoundingClientRect(), o = on.getBoundingClientRect(); row.scrollLeft += o.left - r.left - (r.width - o.width) / 2; }); }
+    $('#fsCaste').innerHTML = castes.length && v !== 'caste' ? `<h3>Caste group</h3>${chipRow('cgrp', [['', 'Any'], ['none', 'Not in a caste'], ...castes.map(gid => [gid, '🏷️ ' + esc(famName(gid))])], S.cgrp)}` : '';
     const fs = S.fgrp === 'sel' ? S.fsel.filter(gid => FAM[gid]) : [];
     $('#fsFamily').innerHTML = fams.length && v !== 'family' ? `<h3>Family</h3><div class="chips wrap">
         <button class="chip ${!S.fgrp ? 'on' : ''}" data-fk="fgrp" data-fv="">Any</button>
