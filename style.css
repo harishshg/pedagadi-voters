@@ -582,3 +582,5 @@ body.has-selbar main{padding-bottom:80px}
 .fam-act.ord{width:44px;font-size:16px;color:var(--brand)}
 .fam-act.ord:disabled{opacity:.25}
 .fam-act.ord-fix{display:flex;align-items:center;justify-content:center;width:88px;font-size:18px}
+/* Filters: Reset / Show N voters stay pinned at the bottom while the sheet scrolls */
+#filterSheet .sheet-actions{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom));z-index:6;background:var(--card);margin:16px -16px calc(-16px - env(safe-area-inset-bottom));padding:10px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);box-shadow:0 -4px 12px rgba(0,0,0,.06)}
