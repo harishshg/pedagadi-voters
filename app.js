@@ -1173,13 +1173,13 @@
     const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
     const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
     $('#famPick').innerHTML = `<h2>Add ${n} voter${n === 1 ? '' : 's'} to a group</h2>
-      <div class="d-actions"><button class="btn primary" id="bpNewF">＋ New family</button><button class="btn primary" id="bpNewC">＋ New caste</button></div>
       ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Your groups</h3><div class="picker-list fp-list">${list.map(gid => {
         const inN = ids.filter(id => inGroup(gid, id)).length, all = inN === n;
         return `<button class="opt ${all ? 'sel' : ''}" data-bg="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}${esc(gLabel(gid))}</div>
           <div class="o-en">${GT[gType(gid)].label} · ${inN ? `${inN} of ${n} already in` : `${gMembers(gid).size} voters`}</div></div><span class="o-n">${all ? 'Remove' : `Add ${n - inN}`}</span></button>`;
-      }).join('')}</div>` : '<p class="hint">No groups yet. Make one above.</p>'}
+      }).join('')}</div>` : '<p class="hint">No groups yet. Make one below.</p>'}
+      <div class="d-actions fp-new"><button class="btn" id="bpNewF">＋ New family</button><button class="btn" id="bpNewC">＋ New caste</button></div>
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
     wireFpSearch(box, focused);
@@ -1762,16 +1762,17 @@
     const v = byId.get(vid), sk = v.surname, sn = sk && SURNAMES.get(sk);
     if (!again) fpQ = '';
     const focused = again && document.activeElement && document.activeElement.classList.contains('fp-q');
-    const list = Object.keys(FAM).sort((a, b) => gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
+    // the voter's own groups first, then the rest by type and name
+    const list = Object.keys(FAM).sort((a, b) => inGroup(b, vid) - inGroup(a, vid) || gType(a).localeCompare(gType(b)) || famName(a).localeCompare(famName(b)));
     const curFam = familiesOf(vid);
     const castesL = list.filter(gid => gType(gid) === 'caste');   // whole-surname adding is for castes only (it added people to families by accident)
     const rowP = gid => { const on = inGroup(gid, vid), mv = !on && gType(gid) === 'family' && curFam.length; return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
       <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : mv ? 'Move here' : 'Add'}</span></button>`; };
     $('#famPick').innerHTML = `<h2>Add to group</h2><p class="fam-sub">${esc(v.name)} · ${esc(v.name_en)}</p>
       ${curFam.length ? `<p class="hint">A voter can be in one family only. Choosing another family moves them out of ${esc(curFam.map(famName).join(', '))}.</p>` : ''}
-      <div class="d-actions"><button class="btn primary" id="fpNewF">＋ New family</button><button class="btn primary" id="fpNewC">＋ New caste</button></div>
       ${fpSearchHTML(list.length)}
-      ${list.length ? `<h3>Add this person</h3><div class="picker-list fp-list">${list.map(rowP).join('')}</div>` : ''}
+      ${list.length ? `<h3>Add this person</h3><div class="picker-list fp-list">${list.map(rowP).join('')}</div>` : '<p class="hint">No groups yet. Make one below.</p>'}
+      <div class="d-actions fp-new"><button class="btn" id="fpNewF">＋ New family</button><button class="btn" id="fpNewC">＋ New caste</button></div>
       ${castesL.length && sn ? `<h3>Add everyone named ${esc(sn.en)} (${sn.n}) to a caste</h3><div class="fam-dd">${castesL.map(gid => FAM[gid].s[sk]
         ? `<button class="fam-chip" data-gs="${gid}">✓ ${esc(gLabel(gid))}</button>` : `<button class="fam-chip add" data-gs="${gid}">＋ ${esc(gLabel(gid))}</button>`).join('')}</div>
         <p class="hint">Adds the whole surname to the group, including people added to the roll later.</p>` : ''}

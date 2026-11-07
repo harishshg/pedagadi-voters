@@ -598,3 +598,5 @@ body.has-selbar main{padding-bottom:80px}
 /* caste card: Voters / Families buttons */
 .cf-nav{display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--line)}
 .cf-nav .btn{flex:1;font-size:13.5px;padding:8px 6px;font-weight:600}
+/* group pickers: New family / New caste come after the list of groups */
+.fp-new{margin-top:12px}
