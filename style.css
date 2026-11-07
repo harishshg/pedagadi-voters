@@ -595,3 +595,6 @@ body.has-selbar main{padding-bottom:80px}
 .cf .member{padding-left:34px}
 .fh-ph.sm{width:32px;height:38px;border-radius:7px}
 .fh-ic.sm{font-size:17px}
+/* caste card: Voters / Families buttons */
+.cf-nav{display:flex;gap:8px;padding:8px 10px;border-top:1px solid var(--line)}
+.cf-nav .btn{flex:1;font-size:13.5px;padding:8px 6px;font-weight:600}

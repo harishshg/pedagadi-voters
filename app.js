@@ -1051,6 +1051,9 @@
     const gl = e.target.closest('[data-fam-list]'); if (gl) { showGroupInList(gl.dataset.famList); return; }
     const f = e.target.closest('[data-fam-open]'); if (f) { showFam(f.dataset.famOpen); return; }
     // family accordion: tap the heading to open / fold it (while selecting, the heading selects instead)
+    // caste card: go to this caste's voters, or its families
+    const cn = e.target.closest('[data-cnav]');
+    if (cn) { const gid = cn.dataset.cg; if (cn.dataset.cnav === 'list') showGroupInList(gid); else { S.cgrp = gid; S.view = 'family'; update(); } return; }
     const sb = !selecting && e.target.closest('[data-sub]');
     if (sb) {
       const key = sb.dataset.sub, gid = key.split('|')[0], g = groups.find(x => x.gid === gid), card = sb.closest('[data-acc-card]'); if (!g || !card) return;
@@ -1557,8 +1560,14 @@
     const fam = g.t === 'family', isOpen = famExpanded.has(g.gid) || !!S.q.trim();
     const show = (fam ? orderMembers(g.gid, g.items) : [...g.items].sort(byFamily)).slice(0, 20), more = g.items.length - show.length, sn = Object.keys(FAM[g.gid].s || {});
     const snTxt = sn.length ? `${sn.slice(0, 4).map(k => esc(SURNAMES.get(k) ? SURNAMES.get(k).en : k)).join(', ')}${sn.length > 4 ? ` +${sn.length - 4}` : ''}` : '';
-    const cnt = `<small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>
+    const cnt = `${fam ? `<small>${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'}</small>` : ''}
       <button class="fam-open" data-fam-open="${g.gid}" aria-label="Open ${esc(g.name)}">Open ›</button>`;
+    // a caste: buttons to its voters (Voters tab) and its families (Families tab), both filtered to this caste
+    let nav = '';
+    if (!fam) {
+      const r = famRank(), fs = new Set(); g.items.forEach(v => { const x = r.get(v.id); if (x && x[2]) fs.add(x[2]); });
+      nav = `<div class="cf-nav"><button class="btn" data-cnav="list" data-cg="${g.gid}">👥 ${g.items.length.toLocaleString()} voter${g.items.length === 1 ? '' : 's'} ›</button><button class="btn" data-cnav="family" data-cg="${g.gid}">👪 ${fs.size.toLocaleString()} famil${fs.size === 1 ? 'y' : 'ies'} ›</button></div>`;
+    }
     let pic, sub;
     if (fam) {
       // head of the family (chosen with 👑, else the eldest member): their photo and name help tell families apart
@@ -1572,11 +1581,11 @@
     }
     const head = `<div class="house-h fh" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="${isOpen}"><i class="acc-chev">▸</i>${pic}
       <span class="fh-t"><b>${esc(g.name)}${fam && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${sub ? `<em class="fh-sub">${sub}</em>` : ''}</span>${cnt}</div>`;
-    if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}</div>`;
-    return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}
+    if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}${nav}</div>`;
+    return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}${nav}
       ${fam && sn.length ? `<div class="g-sn">Surnames: ${snTxt}</div>` : ''}
       ${!fam ? casteFamiliesHTML(g) : show.length ? show.map(memberHTML).join('') : '<div class="fam-empty">No voters yet. Tap <b>Open</b> to add people or surnames.</div>'}
-      ${(fam ? more > 0 : g.items.length) ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
+      ${fam && more > 0 ? `<button class="g-more" data-fam-list="${g.gid}">Show all ${g.items.length.toLocaleString()} in the voter list ›</button>` : ''}</div>`;
   }
   // inside an open caste: its families (biggest first), each folding open to its members; then the people not in a family
   const subExpanded = new Set();   // 'casteId|familyId' (or 'casteId|none') that are open
