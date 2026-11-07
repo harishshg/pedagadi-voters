@@ -501,4 +501,31 @@ body.has-selbar main{padding-bottom:80px}
   .pr-t tr.pr-g td{background:#f2f2f2!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;font-size:11px;break-after:avoid;page-break-after:avoid}
   .pr-t tr.gone td{color:#777}
   .pr-t tr.gone td.nm{text-decoration:line-through}
+  .ps-head{border:1px solid #000;padding:4px 6px;margin-bottom:4px;text-align:center}
+  .ps-t1{font-weight:700;font-size:14px}
+  .ps-t2{font-weight:700;font-size:11px;margin-bottom:3px}
+  .ps-hrow{display:flex;justify-content:space-between;font-size:11px}
+  .ps-num{font-family:"Times New Roman",Times,serif;font-weight:700;font-size:1.08em}
+  .ps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+  .ps{border:1px solid #000;padding:2px 4px 3px;font-size:9px;line-height:1.35;break-inside:avoid;page-break-inside:avoid;min-height:27mm;overflow:hidden}
+  .ps-top{display:flex;justify-content:space-between;gap:4px;align-items:center;margin-bottom:1px;white-space:nowrap;font-size:8px}
+  .ps-top>span{overflow:hidden}
+  .ps-r.ps-one{display:block;white-space:nowrap;text-overflow:ellipsis}
+  .ps-sn{display:inline-block;border:1px solid #000;padding:0 4px;min-width:16px;text-align:center;font-family:"Times New Roman",Times,serif;font-size:10.5px}
+  .ps-st{font-size:8.5px;border:1px solid #000;padding:0 3px}
+  .ps-mid{display:flex;gap:4px}
+  .ps-info{flex:1;min-width:0}
+  .ps-r{display:flex;gap:3px;overflow:hidden}
+  .ps-l{flex:none;width:52px}
+  .ps-v{flex:1;min-width:0;overflow:hidden}
+  .ps-nm{font-weight:700}
+  .ps-v i{display:block;font-size:7.5px;color:#444;font-family:system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ps-cat{margin-left:8px}
+  .ps-v{white-space:nowrap}
+  .ps-ph{flex:none;width:15mm;height:17mm;background:#f3f4f6;align-self:flex-end}
+  .ps-ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .ps.gone{color:#666}
+  .ps.gone .ps-nm{text-decoration:line-through}
+  .ps-g{margin-top:6px}
+  .ps-gh{font-weight:700;font-size:11px;padding:2px 0;break-after:avoid;page-break-after:avoid}
 }

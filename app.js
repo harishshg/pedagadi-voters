@@ -1578,7 +1578,7 @@
 
   // ---------- stats ----------
   // ---------- print: the whole list on screen (not just the cards loaded so far), or the selected voters ----------
-  const PR = Object.assign({ photos: false, phones: true, what: 'all' }, LS.get('pv_print', {}));
+  const PR = Object.assign({ photos: false, phones: true, what: 'all', layout: 'slips' }, LS.get('pv_print', {}));
   const prArea = $('#printArea');
   const prVoterRows = (vs, o, start = 0) => vs.map((v, i) => {
     const st = statusOf(v.id), ph = o.phones ? phonesOf(v.id).map(fmtPhone).join(', ') : '';
@@ -1590,6 +1590,23 @@
       ${o.phones ? `<td>${esc(ph)}</td>` : ''}<td>${st ? (st.k === 'dead' ? 'Dead' : 'Duplicate') : ''}</td></tr>`;
   }).join('');
   const prVoterHead = o => `<thead><tr><th>#</th><th>Ward</th><th>Sr.</th>${o.photos ? '<th>Photo</th>' : ''}<th>Name</th><th>Father / Husband</th><th>House</th><th>Age</th><th>Cat.</th><th>EPIC</th>${o.phones ? '<th>Phone</th>' : ''}<th>Status</th></tr></thead>`;
+  // a box per voter, laid out like the ward PDF and the shared slip image
+  const prSlip = (v, o, mixed) => {
+    const st = statusOf(v.id), ph = o.phones ? phonesOf(v.id).map(fmtPhone).join(', ') : '';
+    return `<div class="ps${st ? ' gone' : ''}">
+      <div class="ps-top"><span>గ్రా.పం.ఓ.జా.వ.సం . <b class="ps-sn">${v.serial}</b>${mixed ? ` <b>వార్డు ${v.ward}</b>` : ''}${marks.has(v.id) ? ' ★' : ''}${st ? ` <b class="ps-st">${st.k === 'dead' ? '✝ Dead' : '⧉ Duplicate'}</b>` : ''}</span>
+        <span>అ.ఓ.జా.వ.సం .<b class="ps-num">31 - ${esc(v.ac_part)} - ${esc(v.ac_serial)}</b></span></div>
+      <div class="ps-mid"><div class="ps-info">
+        <div class="ps-r"><span class="ps-l">ఓటరు పేరు</span><span class="ps-v">: <b class="ps-nm">${esc(v.name || v.name_en || '')}</b><i>${esc(v.name_en || '')}</i></span></div>
+        <div class="ps-r"><span class="ps-l">${REL_TE[v.relation] || 'ఇతరులు'}</span><span class="ps-v">: ${esc(v.relation_name || v.relation_name_en || '')}</span></div>
+        <div class="ps-r"><span class="ps-l">ఇంటి సంఖ్య</span><span class="ps-v">: <b class="ps-num">${esc(v.house_no || '--')}</b><span class="ps-cat">కులము : <b>${CASTE_TE[v.caste] || '--'}</b></span></span></div>
+        <div class="ps-r ps-one">ఓటరు ఐడి. కార్డు నెం. : <b class="ps-num">${esc(v.epic || '--')}</b></div>
+        ${v.age || ph ? `<div class="ps-r ps-one">${v.age ? `వయస్సు : <b class="ps-num">${esc(v.age)}</b>` : ''}${ph ? `<span class="ps-cat">📞 <b class="ps-num">${esc(ph)}</b></span>` : ''}</div>` : ''}
+      </div>${o.photos ? `<div class="ps-ph">${v.photo ? `<img src="photos/${esc(v.photo)}" alt="">` : ''}</div>` : ''}</div></div>`;
+  };
+  const prHeadTe = wards => `<div class="ps-head"><div class="ps-t1">పెదగాడి గ్రామ పంచాయతీ ఓటర్ల జాబితా - 2026</div><div class="ps-t2">పెందుర్తి శాసనసభ నియోజకవర్గము</div>
+    <div class="ps-hrow"><span>గ్రామ పంచాయతీ : <b>పెదగాడి</b></span><span>వార్డు నెంబరు : <b class="ps-num">${wards.join(', ')}</b></span></div>
+    <div class="ps-hrow"><span>మండలము : <b>పెందుర్తి</b></span><span>జిల్లా : <b>విశాఖపట్నం</b></span></div></div>`;
   // what the print would cover, for the sheet's labels: { n, label }
   function prScope(what) {
     if (what === 'sel') return { n: sel.size, label: S.view === 'surnames' ? 'surnames' : 'voters' };
@@ -1611,7 +1628,14 @@
         `<tr><td class="n">${i + 1}</td><td>${esc(r.te)}</td><td>${esc(r.en)}</td><td class="n">${r.n}</td><td>${Object.keys(r.w || {}).sort((a, b) => a - b).map(w => `W${w}: ${r.w[w]}`).join(', ')}</td><td>${esc(r.castes.map(famName).join(', '))}</td></tr>`).join('')}</tbody></table>`;
     } else if (what === 'sel' || !(isGroupView() || S.view === 'house')) {
       const vs = what === 'sel' ? [...sel].map(id => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial) : current;
-      body = `<table class="pr-t">${prVoterHead(o)}<tbody>${prVoterRows(vs, o)}</tbody></table>`;
+      if (o.layout === 'slips') { const ws = [...new Set(vs.map(v => v.ward))].sort((a, b) => a - b); body = prHeadTe(ws) + `<div class="ps-grid">${vs.map(v => prSlip(v, o, ws.length > 1)).join('')}</div>`; }
+      else body = `<table class="pr-t">${prVoterHead(o)}<tbody>${prVoterRows(vs, o)}</tbody></table>`;
+    } else if (o.layout === 'slips') {
+      const ws = [...new Set(groups.flatMap(g => g.items.map(v => v.ward)))].sort((a, b) => a - b);
+      body = prHeadTe(ws) + groups.map(g => {
+        const head = S.view === 'house' ? (([w, h]) => `Ward ${w} · House ${esc(h)}`)(g.key.split('|')) : `${esc(g.name)}`;
+        return `<div class="ps-g"><div class="ps-gh">${head} — ${g.items.length} voter${g.items.length === 1 ? '' : 's'}</div><div class="ps-grid">${g.items.map(v => prSlip(v, o, ws.length > 1)).join('')}</div></div>`;
+      }).join('');
     } else {
       const cols = 10 + (o.photos ? 1 : 0) + (o.phones ? 1 : 0); let k = 0;
       body = `<table class="pr-t">${prVoterHead(o)}<tbody>${groups.map(g => {
@@ -1631,7 +1655,8 @@
     const a = prScope('all'), s = prScope('sel');
     $('#prWhatBox').hidden = !hasSel;
     chips($('#prWhat'), [['all', `All shown (${a.n.toLocaleString()})`], ['sel', `Selected (${s.n.toLocaleString()})`]], PR.what, v => { PR.what = v; drawPrintSheet(); });
-    $('#prOptBox').hidden = isSn;
+    $('#prOptBox').hidden = $('#prLayBox').hidden = isSn;
+    chips($('#prLay'), [['slips', '🪪 Slips (like the roll)'], ['table', '☰ Table rows']], PR.layout, v => { PR.layout = v; drawPrintSheet(); });
     $('#prOpts').innerHTML = [['photos', '🖼 Photos'], ['phones', '📞 Phone numbers']].map(([k, l]) => `<button class="chip ${PR[k] ? 'on' : ''}" data-k="${k}" aria-pressed="${!!PR[k]}">${PR[k] ? '✓ ' : ''}${l}</button>`).join('');
     const c = prScope(PR.what);
     $('#prSub').textContent = `${c.n.toLocaleString()} ${c.label}${S.ward ? ' · Ward ' + S.ward : ''}`;
@@ -1641,13 +1666,13 @@
   $('#printBtn').onclick = () => { if (!selecting) sel.clear(); PR.what = sel.size ? 'sel' : 'all'; drawPrintSheet(); openSheet('#printSheet'); };
   $('#prCancel').onclick = () => closeTop();
   $('#prGo').onclick = async () => {
-    LS.set('pv_print', { photos: PR.photos, phones: PR.phones });
+    LS.set('pv_print', { photos: PR.photos, phones: PR.phones, layout: PR.layout });
     buildPrint(PR); closeTop();
     if (PR.photos && S.view !== 'surnames') { toast('Getting photos ready…'); await prImgs(); }
     setTimeout(() => { prArea._ours = true; window.print(); }, 300);   // let the sheet close first
   };
   // the browser's own Print (Ctrl+P) also gets the full list, not just the cards loaded so far
-  window.addEventListener('beforeprint', () => { if (!prArea._ours) buildPrint({ photos: false, phones: PR.phones, what: 'all' }); });
+  window.addEventListener('beforeprint', () => { if (!prArea._ours) buildPrint({ photos: false, phones: PR.phones, what: 'all', layout: 'table' }); });
   window.addEventListener('afterprint', () => { prArea._ours = false; prArea.innerHTML = ''; });
 
   const COLORS = { BC: 'var(--bc)', SC: 'var(--sc)', ST: 'var(--st)', 'Not specified': 'var(--ns)' };
