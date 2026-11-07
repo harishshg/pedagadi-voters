@@ -106,15 +106,20 @@
     });
     if (raw) {
       const toks = raw.split(/\s+/).filter(Boolean);
-      if (S.nameOnly) list = list.filter(v => toks.every(t => {
+      // a phone number typed any way ("98765 43210", "+91-98765-43210", "098765…", or just part of it)
+      // matches the voter's saved numbers, in both search modes
+      let pd = /^[+\d\s().-]+$/.test(raw) ? raw.replace(/\D/g, '') : '';
+      if (pd.length > 10 && pd.startsWith('91')) pd = pd.slice(2); else if (pd.length === 11 && pd[0] === '0') pd = pd.slice(1);
+      const phoneHit = pd.length >= 4 ? v => phonesOf(v.id).some(p => p.includes(pd)) : () => false;
+      if (S.nameOnly) list = list.filter(v => phoneHit(v) || toks.every(t => {
         if (isTelugu(t)) return v._teN.includes(teNorm(t));
         const p = phon(t);
         return p && v._enN.includes(p);
       }));
-      else list = list.filter(v => toks.every(t => {
+      else list = list.filter(v => phoneHit(v) || toks.every(t => {
         if (isTelugu(t)) return v._te.includes(teNorm(t));
         const tl = t.toLowerCase();
-        if (/^\d+$/.test(t)) return String(v.serial) === t || (t.length >= 4 && (notes[telKey(v.id)] || '').includes(t)) || v._house.startsWith(tl) || v._house.split(/[-/]/).includes(tl) || v.epic.toLowerCase().includes(tl);
+        if (/^\d+$/.test(t)) return String(v.serial) === t ||v._house.startsWith(tl) || v._house.split(/[-/]/).includes(tl) || v.epic.toLowerCase().includes(tl);
         if (/\d/.test(t)) return v._house.includes(tl) || v.epic.toLowerCase().includes(tl);
         const p = phon(t);
         return p && (v._en.includes(p) || v.epic.toLowerCase().includes(tl));
@@ -866,6 +871,25 @@
     openSheet('#phoneSheet');
     setTimeout(() => inp.focus(), 120);
   }
+  // a contact card (.vcf) for the phone's Contacts app; its website field links back to this voter's profile (…/#v=<id>)
+  const profileLink = id => APP_URL + '#v=' + encodeURIComponent(id);
+  async function saveContact(v) {
+    const vc = s => String(s ?? '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
+    const name = v.name_en || v.name || 'Voter';
+    const card = ['BEGIN:VCARD', 'VERSION:3.0', `FN:${vc(name)}`, (() => { const sn = v.surname_en && name.endsWith(' ' + v.surname_en) ? v.surname_en : ''; return `N:${vc(sn)};${vc(sn ? name.slice(0, -sn.length - 1) : name)};;;`; })(),
+      ...phonesOf(v.id).map(p => `TEL;TYPE=CELL:+91${p}`),
+      `URL:${profileLink(v.id)}`,
+      `NOTE:${vc(`${v.name ? v.name + ' · ' : ''}Pedagadi Ward ${v.ward}, serial ${v.serial}, house ${v.house_no || '—'}, EPIC ${v.epic}. Voter profile: ${profileLink(v.id)}`)}`,
+      'END:VCARD'].join('\r\n') + '\r\n';
+    const fname = name.replace(/[^\w ]+/g, '').trim().replace(/\s+/g, '_') + '.vcf';
+    const file = new File([card], fname, { type: 'text/vcard' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    toast('Contact card downloaded. Open it to add to Contacts');
+  }
   function showDetail(id, replace) {
     const v = byId.get(id); if (!v) return;
     $('#detailSheet')._vid = id;
@@ -889,7 +913,7 @@
             <small>${whoLine('n', stKey(v.id)).replace(/<\/?p[^>]*>/g, '')}</small>`;
         })()}</dd>
         <dt>Phone</dt><dd class="ph-dd">${phonesOf(v.id).map(p => `<span class="ph-row"><a class="ph-call" href="tel:+91${p}">📞 ${fmtPhone(p)}</a><a class="ph-wa" href="https://wa.me/91${p}" target="_blank" rel="noopener" aria-label="WhatsApp ${fmtPhone(p)}">WhatsApp</a></span>`).join('')}
-          <button class="fam-chip add" id="dPhone">${phonesOf(v.id).length ? '✎ Edit numbers' : '＋ Add phone number'}</button>${notes[telKey(v.id)] ? `<small>${whoLine('n', telKey(v.id)).replace(/<\/?p[^>]*>/g, '')}</small>` : ''}</dd>
+          <button class="fam-chip add" id="dPhone">${phonesOf(v.id).length ? '✎ Edit numbers' : '＋ Add phone number'}</button>${phonesOf(v.id).length ? '<button class="fam-chip add" id="dContact">👤 Save to phone contacts</button>' : ''}${notes[telKey(v.id)] ? `<small>${whoLine('n', telKey(v.id)).replace(/<\/?p[^>]*>/g, '')}</small>` : ''}</dd>
         <dt>House no.</dt><dd>${esc(v.house_no || '—')}</dd>
         <dt>EPIC no.</dt><dd>${esc(v.epic)}</dd>
         <dt>Caste</dt><dd>${esc(v.caste)}</dd>
@@ -936,6 +960,7 @@
     if ($('#dHouseSlip')) $('#dHouseSlip').onclick = () => showSlips([v, ...fam].sort((a, b) => a.serial - b.serial), `House ${v.house_no || '—'}, Ward ${v.ward}`);
     $('#dFam').onclick = () => showFamPick(v.id);
     $('#dPhone').onclick = () => showPhones(v.id);
+    onB('#dContact', () => saveContact(v));
     $('#detail').querySelectorAll('[data-fam-open]').forEach(b => b.onclick = () => showFam(b.dataset.famOpen));
     $('#detail').querySelectorAll('[data-fam]').forEach(b => b.onclick = () => { showDetail(b.dataset.fam, true); $('#detailSheet .sheet').scrollTop = 0; });
     if ($('#dSurname')) $('#dSurname').onclick = () => {
@@ -1552,6 +1577,79 @@
   const refreshDetailFam = () => { const d = $('#detailSheet'); if (!d.hidden && d._vid) showDetail(d._vid, true); };
 
   // ---------- stats ----------
+  // ---------- print: the whole list on screen (not just the cards loaded so far), or the selected voters ----------
+  const PR = Object.assign({ photos: false, phones: true, what: 'all' }, LS.get('pv_print', {}));
+  const prArea = $('#printArea');
+  const prVoterRows = (vs, o, start = 0) => vs.map((v, i) => {
+    const st = statusOf(v.id), ph = o.phones ? phonesOf(v.id).map(fmtPhone).join(', ') : '';
+    return `<tr${st ? ' class="gone"' : ''}><td class="n">${start + i + 1}</td><td class="n">${v.ward}</td><td class="n">${v.serial}</td>
+      ${o.photos ? `<td>${v.photo ? `<img src="photos/${esc(v.photo)}" alt="">` : ''}</td>` : ''}
+      <td class="nm">${esc(v.name || '—')}${marks.has(v.id) ? ' ★' : ''}<div class="en">${esc(v.name_en)}</div></td>
+      <td>${esc(v.relation)}: ${esc(v.relation_name || '—')}<div class="en">${esc(v.relation_name_en || '')}</div></td>
+      <td>${esc(v.house_no || '—')}</td><td class="n">${esc(v.age || '')}</td><td>${esc(casteLbl(v.caste))}</td><td>${esc(v.epic || '')}</td>
+      ${o.phones ? `<td>${esc(ph)}</td>` : ''}<td>${st ? (st.k === 'dead' ? 'Dead' : 'Duplicate') : ''}</td></tr>`;
+  }).join('');
+  const prVoterHead = o => `<thead><tr><th>#</th><th>Ward</th><th>Sr.</th>${o.photos ? '<th>Photo</th>' : ''}<th>Name</th><th>Father / Husband</th><th>House</th><th>Age</th><th>Cat.</th><th>EPIC</th>${o.phones ? '<th>Phone</th>' : ''}<th>Status</th></tr></thead>`;
+  // what the print would cover, for the sheet's labels: { n, label }
+  function prScope(what) {
+    if (what === 'sel') return { n: sel.size, label: S.view === 'surnames' ? 'surnames' : 'voters' };
+    if (S.view === 'surnames') return { n: groups.length, label: 'surnames' };
+    if (isGroupView()) return { n: groups.length, label: GT[S.view].plural.toLowerCase() };
+    if (S.view === 'house') return { n: groups.length, label: 'households' };
+    return { n: current.length, label: 'voters' };
+  }
+  function buildPrint(o) {
+    const what = o.what === 'sel' && sel.size ? 'sel' : 'all';
+    const filt = [S.q.trim() && `Search: “${S.q.trim()}”`, S.surname && `Surname: ${(SURNAMES.get(S.surname) || {}).en || S.surname}`,
+      S.caste !== 'all' && `Category: ${S.caste}`, S.phone !== 'all' && (S.phone === 'has' ? 'Has phone' : 'No phone'),
+      S.vst !== 'all' && `Status: ${S.vst}`].filter(Boolean).join(' · ');
+    const title = what === 'sel' ? `Selected ${S.view === 'surnames' ? 'surnames' : 'voters'} (${sel.size})` : $('#summary').textContent;
+    let body;
+    if (S.view === 'surnames') {
+      const rows = what === 'sel' ? snRows(true).filter(r => sel.has(r.k)) : groups;
+      body = `<table class="pr-t"><thead><tr><th>#</th><th>Surname</th><th>English</th><th>Voters</th><th>Wards</th><th>Caste</th></tr></thead><tbody>${rows.map((r, i) =>
+        `<tr><td class="n">${i + 1}</td><td>${esc(r.te)}</td><td>${esc(r.en)}</td><td class="n">${r.n}</td><td>${Object.keys(r.w || {}).sort((a, b) => a - b).map(w => `W${w}: ${r.w[w]}`).join(', ')}</td><td>${esc(r.castes.map(famName).join(', '))}</td></tr>`).join('')}</tbody></table>`;
+    } else if (what === 'sel' || !(isGroupView() || S.view === 'house')) {
+      const vs = what === 'sel' ? [...sel].map(id => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial) : current;
+      body = `<table class="pr-t">${prVoterHead(o)}<tbody>${prVoterRows(vs, o)}</tbody></table>`;
+    } else {
+      const cols = 10 + (o.photos ? 1 : 0) + (o.phones ? 1 : 0); let k = 0;
+      body = `<table class="pr-t">${prVoterHead(o)}<tbody>${groups.map(g => {
+        const head = S.view === 'house' ? (([w, h]) => `Ward ${w} · House ${esc(h)}`)(g.key.split('|')) : `${esc(g.name)}`;
+        const rows = prVoterRows(g.items, o, k); k += g.items.length;
+        return `<tr class="pr-g"><td colspan="${cols}">${head} — ${g.items.length} voter${g.items.length === 1 ? '' : 's'}</td></tr>${rows}`;
+      }).join('')}</tbody></table>`;
+    }
+    prArea.innerHTML = `<h1 class="pr-h">Pedagadi Voters 2026 · ${esc(title)}</h1>
+      <p class="pr-meta">${filt ? esc(filt) + ' · ' : ''}Printed ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>${body}`;
+  }
+  // wait for photos so they are not blank on paper
+  const prImgs = () => Promise.all([...prArea.querySelectorAll('img')].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; setTimeout(r, 8000); })));
+  function drawPrintSheet() {
+    const hasSel = sel.size > 0, isSn = S.view === 'surnames';
+    if (!hasSel) PR.what = 'all';
+    const a = prScope('all'), s = prScope('sel');
+    $('#prWhatBox').hidden = !hasSel;
+    chips($('#prWhat'), [['all', `All shown (${a.n.toLocaleString()})`], ['sel', `Selected (${s.n.toLocaleString()})`]], PR.what, v => { PR.what = v; drawPrintSheet(); });
+    $('#prOptBox').hidden = isSn;
+    $('#prOpts').innerHTML = [['photos', '🖼 Photos'], ['phones', '📞 Phone numbers']].map(([k, l]) => `<button class="chip ${PR[k] ? 'on' : ''}" data-k="${k}" aria-pressed="${!!PR[k]}">${PR[k] ? '✓ ' : ''}${l}</button>`).join('');
+    const c = prScope(PR.what);
+    $('#prSub').textContent = `${c.n.toLocaleString()} ${c.label}${S.ward ? ' · Ward ' + S.ward : ''}`;
+    $('#prGo').disabled = !c.n;
+  }
+  $('#prOpts').onclick = e => { const b = e.target.closest('[data-k]'); if (!b) return; PR[b.dataset.k] = !PR[b.dataset.k]; drawPrintSheet(); };
+  $('#printBtn').onclick = () => { if (!selecting) sel.clear(); PR.what = sel.size ? 'sel' : 'all'; drawPrintSheet(); openSheet('#printSheet'); };
+  $('#prCancel').onclick = () => closeTop();
+  $('#prGo').onclick = async () => {
+    LS.set('pv_print', { photos: PR.photos, phones: PR.phones });
+    buildPrint(PR); closeTop();
+    if (PR.photos && S.view !== 'surnames') { toast('Getting photos ready…'); await prImgs(); }
+    setTimeout(() => { prArea._ours = true; window.print(); }, 300);   // let the sheet close first
+  };
+  // the browser's own Print (Ctrl+P) also gets the full list, not just the cards loaded so far
+  window.addEventListener('beforeprint', () => { if (!prArea._ours) buildPrint({ photos: false, phones: PR.phones, what: 'all' }); });
+  window.addEventListener('afterprint', () => { prArea._ours = false; prArea.innerHTML = ''; });
+
   const COLORS = { BC: 'var(--bc)', SC: 'var(--sc)', ST: 'var(--st)', 'Not specified': 'var(--ns)' };
   function bar(c, total) {
     return `<div class="bar">${Object.keys(COLORS).map(k => c[k] ? `<i style="width:${c[k] / total * 100}%;background:${COLORS[k]}"></i>` : '').join('')}</div>`;
@@ -2082,6 +2180,15 @@
   window.addEventListener('online', () => { if (!photoState.finished) cacheAllPhotos(); });
 
   drawChips(); render();
+  // a profile link like …/#v=1-3 (saved in a phone contact) opens that voter
+  const openFromHash = () => {
+    const m = location.hash.match(/(?:^#|&)v=([^&]+)/); if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    const id = decodeURIComponent(m[1]);
+    if (byId.has(id)) showDetail(id); else toast('Voter not found');
+  };
+  openFromHash();
+  window.addEventListener('hashchange', openFromHash);
   // new versions: check whenever the app comes back to the screen; when one is installed, reload
   // straight away if nothing is open, otherwise offer an "Update" button
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

@@ -478,3 +478,27 @@ body.has-selbar main{padding-bottom:80px}
 .msg-mode{margin:0}.msg-mode button{flex-direction:row}
 #msgTxt{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;font-size:15px;background:var(--card);color:var(--ink);resize:vertical}
 .msg-box .hint{margin:0}
+/* ---------- print ---------- */
+.pr-start+.sel-start{margin-left:6px}
+.sel-start.pr-start{margin-left:auto}
+#printArea{display:none}
+@media print{
+  @page{size:A4;margin:10mm}
+  html,body{background:#fff!important;color:#000!important}
+  body{padding:0!important;overflow:visible!important}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important;font-size:10.5px;line-height:1.3;color:#000}
+  .pr-h{margin:0 0 2px;font-size:16px}
+  .pr-meta{margin:0 0 8px;color:#333;font-size:10.5px}
+  .pr-t{width:100%;border-collapse:collapse}
+  .pr-t th,.pr-t td{border:1px solid #999;padding:3px 4px;text-align:left;vertical-align:top}
+  .pr-t thead{display:table-header-group}
+  .pr-t th{background:#e8edf3!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10px}
+  .pr-t tr{break-inside:avoid;page-break-inside:avoid}
+  .pr-t td.n{text-align:right;white-space:nowrap}
+  .pr-t .en{color:#444;font-size:9.5px}
+  .pr-t img{width:34px;height:42px;object-fit:cover;display:block}
+  .pr-t tr.pr-g td{background:#f2f2f2!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700;font-size:11px;break-after:avoid;page-break-after:avoid}
+  .pr-t tr.gone td{color:#777}
+  .pr-t tr.gone td.nm{text-decoration:line-through}
+}

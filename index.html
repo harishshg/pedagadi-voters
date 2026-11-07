@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=54">
+<link rel="stylesheet" href="style.css?v=55">
 <style>.title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.hdr-btns{display:flex;flex-direction:row;gap:6px;flex:none}</style>
 </head>
 <body>
@@ -35,7 +35,7 @@
   </div>
   <div class="search">
     <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 9.5 16a6.5 6.5 0 0 0 4.2-1.6l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
-    <input id="q" type="search" placeholder="Name, father/husband, house no, EPIC, serial…" autocomplete="off" enterkeyhint="search">
+    <input id="q" type="search" placeholder="Name, father/husband, house no, EPIC, serial, phone…" autocomplete="off" enterkeyhint="search">
     <button id="clearQ" class="clear" aria-label="Clear" hidden>×</button>
     <button id="nameOnly" class="name-only" type="button" aria-pressed="false" title="Match only the voter's own name">Name only</button>
   </div>
@@ -55,7 +55,7 @@
 </header>
 
 <main>
-  <div class="summary-row"><div id="summary" class="summary"></div><button id="selectBtn" class="sel-start">☑ Select</button></div>
+  <div class="summary-row"><div id="summary" class="summary"></div><button id="printBtn" class="sel-start pr-start" aria-label="Print this list">🖨 Print</button><button id="selectBtn" class="sel-start">☑ Select</button></div>
   <div id="list" class="list"></div>
   <div id="sentinel"></div>
 </main>
@@ -272,6 +272,19 @@
   </div>
 </div>
 
+<!-- Print: choose what to print -->
+<div class="sheet-backdrop" id="printSheet" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="prTitle">
+    <div class="grab"></div>
+    <h2 id="prTitle">Print</h2>
+    <p class="fam-sub" id="prSub"></p>
+    <div id="prWhatBox"><h3>What to print</h3><div class="chips wrap" id="prWhat"></div></div>
+    <div id="prOptBox"><h3>Include</h3><div class="chips wrap" id="prOpts"></div></div>
+    <p class="hint">To keep a copy, choose <b>Save as PDF</b> on the print screen.</p>
+    <div class="sheet-actions"><button type="button" class="btn" id="prCancel">Cancel</button><button type="button" class="btn primary" id="prGo">🖨 Print</button></div>
+  </div>
+</div>
+
 <div id="moreMenu" class="more-menu" role="menu" hidden>
   <button data-view="house" role="menuitem"><span>🏠</span>Houses<small>voters grouped by house no.</small></button>
   <button data-view="marked" role="menuitem"><span>★</span>Marked<b id="mmMarkedN"></b></button>
@@ -287,9 +300,10 @@
 </div>
 
 <div id="toast" class="toast" hidden></div>
+<div id="printArea"></div>
 <button id="updBar" class="upd-bar" hidden>✨ New version ready · <b>Tap to update</b></button>
 
-<script src="data.js?v=54"></script>
-<script src="app.js?v=54"></script>
+<script src="data.js?v=55"></script>
+<script src="app.js?v=55"></script>
 </body>
 </html>

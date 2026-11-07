@@ -1,6 +1,6 @@
-const CACHE = 'pv-v54';
+const CACHE = 'pv-v57';
 const PHOTO_CACHE = 'pv-photos'; // kept across app updates
-const SHELL = ['./', 'index.html', 'style.css?v=50', 'app.js?v=50', 'data.js?v=50', 'manifest.json', 'icon.svg', 'icon-192.png', 'qr.svg'];
+const SHELL = ['./', 'index.html', 'style.css?v=55', 'app.js?v=55', 'data.js?v=55', 'manifest.json', 'icon.svg', 'icon-192.png', 'qr.svg'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== PHOTO_CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
