@@ -433,12 +433,23 @@
     $('#ageVal').textContent = S.age === 'unk' && lo === AGE_MIN && hi === AGE_MAX ? 'Not known'
       : lo === AGE_MIN && hi === AGE_MAX ? 'Any' : hi === AGE_MAX ? `${lo}+` : lo === AGE_MIN ? `up to ${hi}` : `${lo}–${hi}`;
   }
+  // while a handle is dragged, a big number floats above it
+  const ageTip = $('#ageTip');
+  function showAgeTip(inp) {
+    const x = +inp.value, pct = (x - AGE_MIN) / (AGE_MAX - AGE_MIN) * 100;
+    ageTip.textContent = x === AGE_MAX ? '100+' : x; ageTip.style.left = pct + '%'; ageTip.hidden = false;
+  }
+  const hideAgeTip = () => { ageTip.hidden = true; };
+  ['#ageLo', '#ageHi'].forEach(id => { const el = $(id);
+    el.addEventListener('pointerdown', () => showAgeTip(el));
+    ['pointerup', 'pointercancel', 'change', 'blur'].forEach(ev => el.addEventListener(ev, hideAgeTip));
+  });
   let ageT = 0;
   ['#ageLo', '#ageHi'].forEach(id => $(id).oninput = e => {
     let lo = +$('#ageLo').value, hi = +$('#ageHi').value;
     if (lo > hi) { if (e.target.id === 'ageLo') lo = hi; else hi = lo; $('#ageLo').value = lo; $('#ageHi').value = hi; }
     if (S.age === 'unk') S.age = 'all';
-    paintAge(lo, hi);
+    paintAge(lo, hi); showAgeTip(e.target);
     clearTimeout(ageT); ageT = setTimeout(() => {
       S.age = lo === AGE_MIN && hi === AGE_MAX ? 'all' : `${lo === AGE_MIN ? '' : lo}-${hi === AGE_MAX ? '' : hi}`;
       saveState(); drawChips(); render(); if (selecting) drawSelBar();
