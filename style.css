@@ -601,3 +601,5 @@ body.has-selbar main{padding-bottom:80px}
 /* group pickers: New family / New caste come after the list of groups */
 .fp-new{margin-top:12px}
 .o-en .recent{color:var(--brand);font-weight:700}
+/* English name shown after the Telugu name of a caste / family */
+.g-en{font-size:.82em;font-weight:400;opacity:.7}

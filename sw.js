@@ -1,4 +1,4 @@
-const CACHE = 'pv-v89';
+const CACHE = 'pv-v90';
 const PHOTO_CACHE = 'pv-photos'; // kept across app updates
 const SHELL = ['./', 'index.html', 'style.css?v=76', 'app.js?v=85', 'data.js?v=57', 'manifest.json', 'icon.svg', 'icon-192.png', 'qr.svg'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));

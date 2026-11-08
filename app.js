@@ -165,7 +165,7 @@
   // the caste groups and family a voter is in, as a small line on the tile
   function grpLine(v) {
     const c = [], f = [];
-    Object.keys(FAM).forEach(gid => { if (inGroup(gid, v.id)) (gType(gid) === 'caste' ? c : f).push(esc(famName(gid))); });
+    Object.keys(FAM).forEach(gid => { if (inGroup(gid, v.id)) (gType(gid) === 'caste' ? c : f).push(gNameHTML(gid)); });
     if (!c.length && !f.length) return '';
     return `<div class="grp">${c.length ? `<span class="g-c">🏷️ ${c.join(', ')}</span>` : ''}${f.length ? `<span class="g-f">👪 ${f.join(', ')}</span>` : ''}</div>`;
   }
@@ -210,7 +210,7 @@
       const pct = all.length ? Math.round(inCaste / all.length * 100) : 0;
       listEl.innerHTML = `<div class="sn-tabs">${tab('none', 'Not assigned', none)}${tab('any', 'Assigned', inCaste)}${tab('all', 'All', all.length)}</div>
         <div class="sn-progress" title="${pct}% of surnames have a caste"><i style="width:${pct}%"></i></div>
-        ${(S.snf === 'any' || FAM[S.snf]) && castes.length ? `<div class="chips wrap g-types">${chip('any', 'Every caste')}${castes.map(gid => chip(gid, `🏷️ ${esc(famName(gid))} ${all.filter(r => r.castes.includes(gid)).length}`)).join('')}</div>` : ''}
+        ${(S.snf === 'any' || FAM[S.snf]) && castes.length ? `<div class="chips wrap g-types">${chip('any', 'Every caste')}${castes.map(gid => chip(gid, `🏷️ ${gNameHTML(gid)} ${all.filter(r => r.castes.includes(gid)).length}`)).join('')}</div>` : ''}
         <div class="sn-tools"><span>Sort:</span>${[['count', 'Most voters'], ['az', 'A–Z']].map(([k, l]) => `<button class="chip ${S.snsort === k ? 'on' : ''}" data-snsort="${k}">${l}</button>`).join('')}
         <button class="chip" data-new="caste">＋ New caste</button></div>` +
         (groups.length ? '' : `<div class="empty">${S.snf === 'none' && !S.q.trim() ? '🎉 Every surname has a caste.' : S.snf === 'any' && !S.q.trim() ? 'No surname has a caste yet.<br>Open “Not assigned”, select surnames and tap “Set caste”.' : 'No surname matches.'}</div>`);
@@ -303,10 +303,10 @@
     $('#surnameClear').hidden = !sn;
     const af = [];
     if (S.view !== 'surnames') {
-      if (S.cgrp && S.view !== 'caste') af.push(`<button class="af" data-clear="cgrp">${S.cgrp === 'none' ? 'Not in a caste' : esc(gLabel(S.cgrp))} <b>×</b></button>`);
+      if (S.cgrp && S.view !== 'caste') af.push(`<button class="af" data-clear="cgrp">${S.cgrp === 'none' ? 'Not in a caste' : gLabelHTML(S.cgrp)} <b>×</b></button>`);
       if (S.fgrp === 'none' && S.view !== 'family') af.push(`<button class="af" data-clear="fgrp">Not in a family <b>×</b></button>`);
       if (S.fgrp === 'sel' && S.view !== 'family') af.push(...(S.fsel.length <= 2
-        ? S.fsel.map(gid => `<button class="af" data-ffrm="${gid}">👪 ${esc(famName(gid))} <b>×</b></button>`)
+        ? S.fsel.map(gid => `<button class="af" data-ffrm="${gid}">👪 ${gNameHTML(gid)} <b>×</b></button>`)
         : [`<button class="af" data-clear="fgrp">👪 ${S.fsel.length} families <b>×</b></button>`]));
       if (S.marked && S.view !== 'marked') af.push(`<button class="af" data-clear="marked">★ Marked only <b>×</b></button>`);
     }
@@ -475,7 +475,7 @@
     $('#fsTitle').textContent = isSn ? 'Surnames: filter & sort' : isG ? `${GT[v].plural}: filter & sort` : v === 'house' ? 'Houses: filters' : 'Filters & sort';
     $('#fsVoters').hidden = isSn;
     $('#fsSurnames').innerHTML = isSn ? `<h3>Show</h3>${chipRow('snf', [['none', 'Not assigned'], ['any', 'Assigned'], ['all', 'All']], S.snf)}
-      ${castes.length ? `<h3>In caste</h3>${chipRow('snf', castes.map(gid => [gid, '🏷️ ' + esc(famName(gid))]), S.snf)}` : ''}
+      ${castes.length ? `<h3>In caste</h3>${chipRow('snf', castes.map(gid => [gid, '🏷️ ' + gNameHTML(gid)]), S.snf)}` : ''}
       <h3>Sort by</h3>${chipRow('snsort', [['count', 'Most voters'], ['az', 'A–Z']], S.snsort)}
       <p class="hint">Use the ward chips at the top to see one ward’s surnames.</p>` : '';
     $('#fsGroupSort').innerHTML = isG ? `<h3>Sort ${GT[v].plural.toLowerCase()} by</h3>${chipRow('gsort', [['size', 'Most voters'], ['name', 'Name (A–Z)']], S.gsort)}
@@ -484,13 +484,13 @@
     const inCaste = new Set(), cN = new Map(castes.map(gid => { const m = gMembers(gid); m.forEach((_, id) => inCaste.add(id)); return [gid, m.size]; }));
     const noCaste = V.length - inCaste.size;
     const byN = [...castes].sort((a, b) => cN.get(b) - cN.get(a) || famName(a).localeCompare(famName(b)));
-    $('#fsCaste').innerHTML = castes.length && v !== 'caste' ? `<h3>Caste group</h3>${chipRow('cgrp', [['', 'Any'], ['none', `Not in a caste <small class="c-n">${noCaste.toLocaleString()}</small>`], ...byN.map(gid => [gid, `🏷️ ${esc(famName(gid))} <small class="c-n">${cN.get(gid).toLocaleString()}</small>`])], S.cgrp)}` : '';
+    $('#fsCaste').innerHTML = castes.length && v !== 'caste' ? `<h3>Caste group</h3>${chipRow('cgrp', [['', 'Any'], ['none', `Not in a caste <small class="c-n">${noCaste.toLocaleString()}</small>`], ...byN.map(gid => [gid, `🏷️ ${gNameHTML(gid)} <small class="c-n">${cN.get(gid).toLocaleString()}</small>`])], S.cgrp)}` : '';
     const fs = S.fgrp === 'sel' ? S.fsel.filter(gid => FAM[gid]) : [];
     $('#fsFamily').innerHTML = fams.length && v !== 'family' ? `<h3>Family</h3><div class="chips wrap">
         <button class="chip ${!S.fgrp ? 'on' : ''}" data-fk="fgrp" data-fv="">Any</button>
         <button class="chip ${S.fgrp === 'none' ? 'on' : ''}" data-fk="fgrp" data-fv="none">Not in a family</button>
         <button class="chip ${fs.length ? 'on' : ''}" data-ffpick>👪 ${fs.length ? `${fs.length} chosen · Change` : `Choose families (${fams.length})`}</button></div>
-      ${fs.length ? `<div class="chips wrap ff-sel">${fs.map(gid => `<button class="chip on" data-ffrm="${gid}">${esc(famName(gid))} <b>×</b></button>`).join('')}</div>` : ''}` : '';
+      ${fs.length ? `<div class="chips wrap ff-sel">${fs.map(gid => `<button class="chip on" data-ffrm="${gid}">${gNameHTML(gid)} <b>×</b></button>`).join('')}</div>` : ''}` : '';
     $('#fsSort').hidden = !(v === 'list' || v === 'marked');
     const n = isSn || isG || v === 'house' ? groups.length : current.length;
     const what = isSn ? 'surname' : isG ? GT[v].label.toLowerCase() : v === 'house' ? 'house' : 'voter';
@@ -516,12 +516,12 @@
   function drawFamFilter() {
     const raw = $('#ffQ').value.trim().toLowerCase(), p = phon(raw), sel = new Set(S.fgrp === 'sel' ? S.fsel : []);
     const all = Object.keys(FAM).filter(gid => gType(gid) === 'family');
-    const items = all.filter(gid => { const n = famName(gid).toLowerCase(); return !raw || n.includes(raw) || (p && n.split(/\s+/).map(phon).join(' ').includes(p)); })
+    const items = all.filter(gid => { const n = famShow(gid).toLowerCase(); return !raw || n.includes(raw) || (p && n.split(/\s+/).map(phon).join(' ').includes(p)); })
       .sort((a, b) => sel.has(b) - sel.has(a) || famName(a).localeCompare(famName(b)));
     $('#ffN').textContent = sel.size ? `${sel.size} chosen · ${current.length.toLocaleString()} voters` : `${all.length} families · tap to choose`;
     $('#ffClear').hidden = !sel.size;
     $('#ffList').innerHTML = items.length ? items.map(gid => `<button class="opt ff-opt ${sel.has(gid) ? 'sel' : ''}" role="option" aria-selected="${sel.has(gid)}" data-ff="${gid}">
-        <span class="ff-box">${sel.has(gid) ? '✓' : ''}</span><div class="o-main"><div class="o-te">${esc(famName(gid))}${isReviewed(gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</div></div>
+        <span class="ff-box">${sel.has(gid) ? '✓' : ''}</span><div class="o-main"><div class="o-te">${gNameHTML(gid)}${isReviewed(gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</div></div>
         <span class="o-n">${gMembers(gid).size}</span></button>`).join('') : '<div class="empty">No family matches.</div>';
     $('#ffDone').textContent = sel.size ? `Show ${current.length.toLocaleString()} voters` : 'Done';
   }
@@ -558,7 +558,7 @@
   }
   function openSurnamePicker(gid) {
     pickFor = typeof gid === 'string' ? gid : '';
-    $('#surnameSheet h2').textContent = pickFor ? `Add surnames to ${famName(pickFor)}` : 'Choose surname';
+    $('#surnameSheet h2').textContent = pickFor ? `Add surnames to ${famShow(pickFor)}` : 'Choose surname';
     $('#surnameQ').value = '';
     const drawSort = () => chips($('#surnameSort'), [['count', 'Most voters'], ['az', 'A–Z']], pickSort, v => { pickSort = v; drawSort(); drawSurnameList(); });
     drawSort();
@@ -973,7 +973,7 @@
         <dt>Ward</dt><dd>${v.ward}</dd>
         <dt>Serial no.</dt><dd>${v.serial}</dd>
         <dt>Surname</dt><dd>${v.surname ? `${esc(v.surname)} · ${esc(v.surname_en)}<small><button class="linkish" id="dSurname">See all ${SURNAMES.get(v.surname).n} ${esc(v.surname_en)} voters</button></small>` : '—'}</dd>
-        <dt>Groups</dt><dd class="fam-dd">${Object.keys(FAM).filter(gid => inGroup(gid, v.id)).map(gid => `<button class="fam-chip" data-fam-open="${gid}">${esc(gLabel(gid))}</button>`).join('')}<button class="fam-chip add" id="dFam">＋ Add to group</button></dd>
+        <dt>Groups</dt><dd class="fam-dd">${Object.keys(FAM).filter(gid => inGroup(gid, v.id)).map(gid => `<button class="fam-chip" data-fam-open="${gid}">${gLabelHTML(gid)}</button>`).join('')}<button class="fam-chip add" id="dFam">＋ Add to group</button></dd>
         <dt>Status</dt><dd class="fam-dd st-dd">${(() => {
           const st = statusOf(v.id), of = st && st.of && byId.get(st.of);
           if (!st) return `<button class="fam-chip add" id="dDead">✝ Mark as dead</button><button class="fam-chip add" id="dDup">⧉ Mark as duplicate</button>`;
@@ -994,7 +994,7 @@
         <button class="btn" id="dShare">Share</button>
       </div>
       <button class="btn wa w100 wa-slip" id="dSlip">${WA_ICON}<span>Share voter slip on WhatsApp</span></button>
-      ${myFams.length ? myFams.map(gid => `<button class="btn wa-out w100 wa-slip" data-fam-slip="${gid}">${WA_ICON}<span>Share slips of family “${esc(famName(gid))}” (${gMembers(gid).size})</span></button>`).join('') : ''}
+      ${myFams.length ? myFams.map(gid => `<button class="btn wa-out w100 wa-slip" data-fam-slip="${gid}">${WA_ICON}<span>Share slips of family “${gNameHTML(gid)}” (${gMembers(gid).size})</span></button>`).join('') : ''}
       ${marked ? whoLine('m', v.id) : ''}
       <textarea class="note" id="dNote" placeholder="${cloud.code ? 'Note (synced with your sync code)' : 'Private note (saved on this phone only)'}">${esc(notes[v.id] || '')}</textarea>
       ${notes[v.id] ? whoLine('n', v.id) : ''}
@@ -1024,7 +1024,7 @@
     onB('#dDup', () => showDupPick(v.id));
     onB('#dStUndo', () => { setStatus(v.id, ''); showDetail(v.id, true); toast('Status removed'); });
     $('#detail').querySelectorAll('[data-dup-of]').forEach(b => b.onclick = () => { showDetail(b.dataset.dupOf, true); $('#detailSheet .sheet').scrollTop = 0; });
-    $('#detail').querySelectorAll('[data-fam-slip]').forEach(b => b.onclick = () => showSlips(famSlipVoters(b.dataset.famSlip), famName(b.dataset.famSlip)));
+    $('#detail').querySelectorAll('[data-fam-slip]').forEach(b => b.onclick = () => showSlips(famSlipVoters(b.dataset.famSlip), famTe(b.dataset.famSlip) || famName(b.dataset.famSlip)));
     if ($('#dHouseSlip')) $('#dHouseSlip').onclick = () => showSlips([v, ...fam].sort((a, b) => a.serial - b.serial), `House ${v.house_no || '—'}, Ward ${v.ward}`);
     $('#dFam').onclick = () => showFamPick(v.id);
     $('#dPhone').onclick = () => showPhones(v.id);
@@ -1155,7 +1155,7 @@
       fpQ = inp.value; const toks = fpQ.trim().toLowerCase().split(/\s+/).filter(Boolean);
       let any = false;
       box.querySelectorAll('[data-g], [data-bg], [data-gs]').forEach(el => {
-        const name = famName(el.dataset.g || el.dataset.bg || el.dataset.gs).toLowerCase();
+        const name = famShow(el.dataset.g || el.dataset.bg || el.dataset.gs).toLowerCase();
         const hit = toks.every(t => name.includes(t)); el.style.display = hit ? '' : 'none';
         if (hit && !el.dataset.gs) any = true;
       });
@@ -1176,7 +1176,7 @@
       ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Your groups</h3><div class="picker-list fp-list">${list.map(gid => {
         const inN = ids.filter(id => inGroup(gid, id)).length, all = inN === n;
-        return `<button class="opt ${all ? 'sel' : ''}" data-bg="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}${esc(gLabel(gid))}</div>
+        return `<button class="opt ${all ? 'sel' : ''}" data-bg="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}${gLabelHTML(gid)}</div>
           <div class="o-en">${recentRank(gid) < 99 ? '<b class="recent">🕘 Recent</b> · ' : ''}${GT[gType(gid)].label} · ${inN ? `${inN} of ${n} already in` : `${gMembers(gid).size} voters`}</div></div><span class="o-n">${all ? 'Remove' : `Add ${n - inN}`}</span></button>`;
       }).join('')}</div>` : '<p class="hint">No groups yet. Make one below.</p>'}
       <div class="d-actions fp-new"><button class="btn" id="bpNewF">＋ New family</button><button class="btn" id="bpNewC">＋ New caste</button></div>
@@ -1188,9 +1188,9 @@
     box.querySelector('#bpNewC').onclick = () => bulkNew('caste');
     box.querySelectorAll('[data-bg]').forEach(b => b.onclick = async () => {
       const gid = b.dataset.bg, all = ids.every(id => inGroup(gid, id));
-      if (all) { if (!await askSure({ title: `Remove from ${famName(gid)}?`, body: `<p>Take the ${n} selected voter${n === 1 ? '' : 's'} out of <b>${esc(famName(gid))}</b>. The voters themselves are not deleted.</p>`, ok: 'Remove', danger: true })) return; gRemoveMany(gid, ids); toast(`Removed ${n} from ${famName(gid)}`); showBulkPick(true); return; }
+      if (all) { if (!await askSure({ title: `Remove from ${famShow(gid)}?`, body: `<p>Take the ${n} selected voter${n === 1 ? '' : 's'} out of <b>${gNameHTML(gid)}</b>. The voters themselves are not deleted.</p>`, ok: 'Remove', danger: true })) return; gRemoveMany(gid, ids); toast(`Removed ${n} from ${famShow(gid)}`); showBulkPick(true); return; }
       const added = gAddMany(gid, ids);
-      toast(`Added ${added} to ${famName(gid)}${lastMoved ? ` (${lastMoved} moved from another family)` : ''}`); leaveSelect();
+      toast(`Added ${added} to ${famShow(gid)}${lastMoved ? ` (${lastMoved} moved from another family)` : ''}`); leaveSelect();
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
@@ -1267,7 +1267,7 @@
     if (!name) return;
     const gid = famNew(name, t);
     gAddMany(gid, ids);
-    toast(`Made ${famName(gid)} with ${ids.length} voters`); leaveSelect();
+    toast(`Made ${famShow(gid)} with ${ids.length} voters`); leaveSelect();
   }
 
   // ---------- groups: families and castes ----------
@@ -1278,6 +1278,89 @@
   const gType = gid => (FAM[gid] && GT[FAM[gid].t]) ? FAM[gid].t : 'family';
   const famName = gid => (FAM[gid] && FAM[gid].name) || 'Unnamed group';
   const gLabel = gid => `${GT[gType(gid)].icon} ${famName(gid)}`;
+  // ---------- Telugu for caste and family names ----------
+  // Names stay as typed (English); the Telugu is worked out here and shown next to them.
+  // Order: common words → known castes → surnames → words from voter names → phonetic spelling.
+  const TE_WORDS = { family: 'కుటుంబం', families: 'కుటుంబాలు', house: 'ఇల్లు', ward: 'వార్డు', relatives: 'బంధువులు', relative: 'బంధువు',
+    and: 'మరియు', group: 'గ్రూపు', colony: 'కాలనీ', street: 'వీధి', others: 'ఇతరులు', other: 'ఇతర', friends: 'స్నేహితులు',
+    new: 'కొత్త', old: 'పాత', big: 'పెద్ద', small: 'చిన్న', caste: 'కులం', village: 'గ్రామం', r: 'రావు', bc: 'బీసీ', sc: 'ఎస్సీ', st: 'ఎస్టీ', oc: 'ఓసీ' };
+  const TE_CASTES = { kapu: 'కాపు', 'turpu kapu': 'తూర్పు కాపు', telaga: 'తెలగ', balija: 'బలిజ', ontari: 'ఒంటరి', yadava: 'యాదవ', yadav: 'యాదవ్',
+    golla: 'గొల్ల', gollalu: 'గొల్లలు', velama: 'వెలమ', 'koppula velama': 'కొప్పుల వెలమ', 'polinati velama': 'పోలినాటి వెలమ', reddy: 'రెడ్డి',
+    reddi: 'రెడ్డి', kamma: 'కమ్మ', brahmin: 'బ్రాహ్మణ', brahmins: 'బ్రాహ్మణులు', brahmana: 'బ్రాహ్మణ', kshatriya: 'క్షత్రియ', raju: 'రాజు', rajulu: 'రాజులు',
+    vysya: 'వైశ్య', vaisya: 'వైశ్య', komati: 'కోమటి', arya: 'ఆర్య', gavara: 'గవర', kalinga: 'కళింగ', 'turpu kalinga': 'తూర్పు కళింగ', mala: 'మాల',
+    madiga: 'మాదిగ', relli: 'రెల్లి', settibalija: 'శెట్టిబలిజ', 'setti balija': 'శెట్టి బలిజ', goud: 'గౌడ్', gouda: 'గౌడ', goundla: 'గౌండ్ల',
+    yata: 'యాత', segidi: 'సెగిడి', jalari: 'జాలరి', vadabalija: 'వాడబలిజ', 'vada balija': 'వాడ బలిజ', agnikula: 'అగ్నికుల', mudiraj: 'ముదిరాజ్',
+    rajaka: 'రజక', chakali: 'చాకలి', nayi: 'నాయీ', 'nayi brahmin': 'నాయీ బ్రాహ్మణ', mangali: 'మంగలి', viswabrahmin: 'విశ్వబ్రాహ్మణ',
+    vishwabrahmin: 'విశ్వబ్రాహ్మణ', kummari: 'కుమ్మరి', kamsali: 'కంసాలి', vadrangi: 'వడ్రంగి', kammari: 'కమ్మరి', padmasali: 'పద్మశాలి',
+    devanga: 'దేవాంగ', gandla: 'గాండ్ల', telukula: 'తెలుకుల', vadde: 'వడ్డె', vaddera: 'వడ్డెర', uppara: 'ఉప్పర', bestha: 'బెస్త', boya: 'బోయ',
+    valmiki: 'వాల్మీకి', dora: 'దొర', 'konda dora': 'కొండ దొర', bagata: 'బగత', koya: 'కోయ', savara: 'సవర', jatapu: 'జాతపు', kondh: 'కోంధ్',
+    muslim: 'ముస్లిం', muslims: 'ముస్లింలు', christian: 'క్రైస్తవ', christians: 'క్రైస్తవులు', dalit: 'దళిత', nagaralu: 'నాగరాలు', kalavanthula: 'కళావంతుల',
+    peddinti: 'పెద్దింటి', 'peddinti gollalu': 'పెద్దింటి గొల్లలు', srisayana: 'శ్రీశయన', sondi: 'సొండి', kurmi: 'కుర్మి', kurma: 'కుర్మ', dasari: 'దాసరి',
+    jangam: 'జంగం', bhatraju: 'భట్రాజు', nagavasam: 'నాగవాసం', palli: 'పల్లి', pallekaru: 'పల్లెకారు', mutharasi: 'ముత్తరాశి', thurpu: 'తూర్పు', turpu: 'తూర్పు' };
+  let teDict = null;   // english word → telugu, learnt from the voter list
+  function buildTeDict() {
+    const votes = new Map(), sn = new Map();
+    const add = (en, te) => { if (!en || !te || !isTelugu(te)) return; const k = en.toLowerCase(); let m = votes.get(k); if (!m) votes.set(k, m = new Map()); m.set(te, (m.get(te) || 0) + 1); };
+    V.forEach(v => {
+      if (v.surname_en && v.surname) sn.set(v.surname_en.toLowerCase(), v.surname);
+      [[v.name_en, v.name], [v.relation_name_en, v.relation_name]].forEach(([en, te]) => {
+        const a = (en || '').split(/\s+/).filter(Boolean), b = (te || '').split(/\s+/).filter(Boolean);
+        if (a.length === b.length) a.forEach((w, i) => add(w, b[i]));
+      });
+    });
+    teDict = new Map();
+    votes.forEach((m, k) => teDict.set(k, [...m.entries()].sort((x, y) => y[1] - x[1])[0][0]));
+    sn.forEach((te, k) => teDict.set(k, te));   // the standard surname spelling wins
+  }
+  // rough phonetic spelling for words found nowhere else
+  const TL_C = [['ksh', 'క్ష'], ['chh', 'ఛ'], ['kh', 'ఖ'], ['gh', 'ఘ'], ['ch', 'చ'], ['jh', 'ఝ'], ['th', 'త'], ['dh', 'ద'], ['ph', 'ఫ'], ['bh', 'భ'], ['sh', 'ష'],
+    ['k', 'క'], ['g', 'గ'], ['c', 'క'], ['j', 'జ'], ['t', 'ట'], ['d', 'డ'], ['n', 'న'], ['p', 'ప'], ['b', 'బ'], ['m', 'మ'], ['y', 'య'], ['r', 'ర'],
+    ['l', 'ల'], ['v', 'వ'], ['w', 'వ'], ['s', 'స'], ['h', 'హ'], ['f', 'ఫ'], ['z', 'జ'], ['x', 'క్స'], ['q', 'క']];
+  const TL_V = [['aa', 'ఆ', 'ా'], ['ai', 'ఐ', 'ై'], ['au', 'ఔ', 'ౌ'], ['ee', 'ఈ', 'ీ'], ['ii', 'ఈ', 'ీ'], ['oo', 'ఊ', 'ూ'], ['ou', 'ఔ', 'ౌ'],
+    ['a', 'అ', ''], ['i', 'ఇ', 'ి'], ['u', 'ఉ', 'ు'], ['e', 'ఎ', 'ె'], ['o', 'ఒ', 'ో']];
+  function translit(w) {
+    w = w.toLowerCase(); let out = '', i = 0, pend = false;   // pend: a consonant waiting for its vowel
+    while (i < w.length) {
+      const v = TL_V.find(([e]) => w.startsWith(e, i));
+      if (v) { out += pend ? v[2] : v[1]; pend = false; i += v[0].length; continue; }
+      const c = TL_C.find(([e]) => w.startsWith(e, i));
+      if (!c) { out += (pend ? '్' : '') + w[i]; pend = false; i++; continue; }
+      const next = w.slice(i + c[0].length);
+      // m / n before another consonant or at the end: the anusvara (Vanam → వనం, Venkat → వెంకట్)
+      if ((c[0] === 'm' || c[0] === 'n') && (!next || (!TL_V.some(([e]) => next.startsWith(e)) && next[0] !== 'y' && next[0] !== c[0]))) {
+        if (pend) out += '్'; out += 'ం'; pend = false; i++; continue; }
+      out += (pend ? '్' : '') + c[1]; pend = true; i += c[0].length;
+    }
+    return out + (pend ? '్' : '');
+  }
+  const teCache = new Map();
+  function toTelugu(name) {
+    name = String(name || '').trim(); if (!name || isTelugu(name)) return '';
+    if (teCache.has(name)) return teCache.get(name);
+    if (!teDict) buildTeDict();
+    const word = w => { const k = w.toLowerCase().replace(/['’]s$/, '');
+      return TE_WORDS[k] || TE_CASTES[k] || teDict.get(k) || (/^[a-z]+$/.test(k) ? translit(k) : w); };
+    // longest known caste phrase first ("Koppula Velama"), then word by word
+    const parts = name.split(/([A-Za-z'’]+)/), out = [];
+    for (let i = 0; i < parts.length; i++) {
+      if (!/[A-Za-z]/.test(parts[i])) { out.push(parts[i]); continue; }
+      let hit = '';
+      for (let j = Math.min(parts.length - 1, i + 4); j > i; j -= 2) {
+        if (!/^\s+$/.test(parts[i + 1] || '')) break;
+        const phrase = parts.slice(i, j + 1).join('').toLowerCase().replace(/\s+/g, ' ');
+        if (TE_CASTES[phrase]) { hit = TE_CASTES[phrase]; i = j; break; }
+      }
+      out.push(hit || word(parts[i]));
+    }
+    const te = out.join('').trim();
+    teCache.set(name, te); return te;
+  }
+  const famTe = gid => toTelugu(FAM[gid] && FAM[gid].name);
+  // plain text, for toasts and titles: "చెల్లుబోయిన కుటుంబం · Chelluboyina family"
+  const famShow = gid => { const te = famTe(gid); return te ? `${te} · ${famName(gid)}` : famName(gid); };
+  // HTML: Telugu first, English smaller after it
+  const gNameHTML = gid => { const te = famTe(gid); return te ? `${esc(te)} <small class="g-en">${esc(famName(gid))}</small>` : esc(famName(gid)); };
+  const gLabelHTML = gid => `${GT[gType(gid)].icon} ${gNameHTML(gid)}`;
   // voter ids of a group, and why each one is in it
   function gMembers(gid) {
     const g = FAM[gid], out = new Map(); if (!g) return out;
@@ -1322,7 +1405,7 @@
   }
   function gAddVoter(gid, vid) { touchRecent(gid); const from = leaveOtherFamilies(gid, vid).map(famName); gSet(gid, 'x', vid, false); const v = byId.get(vid); if (!(v && v.surname && FAM[gid].s[v.surname])) gSet(gid, 'v', vid, true); famChanged(); return from; }
   // toast text for adding one voter: says where they moved from
-  const addedMsg = (gid, from) => from.length ? `Moved from ${from.join(', ')} to ${famName(gid)}` : `Added to ${famName(gid)}`;
+  const addedMsg = (gid, from) => from.length ? `Moved from ${from.join(', ')} to ${famShow(gid)}` : `Added to ${famShow(gid)}`;
   function gRemoveVoter(gid, vid) {
     const v = byId.get(vid), g = FAM[gid];
     gSet(gid, 'v', vid, false);
@@ -1343,7 +1426,7 @@
   // a surname belongs to one caste: putting it in a caste takes it out of any other caste group
   function setCaste(sk, gid) {
     const moved = [];
-    Object.keys(FAM).forEach(o => { if (o !== gid && gType(o) === 'caste' && FAM[o].s[sk]) { gSurnameRaw(o, sk, false); moved.push(famName(o)); } });
+    Object.keys(FAM).forEach(o => { if (o !== gid && gType(o) === 'caste' && FAM[o].s[sk]) { gSurnameRaw(o, sk, false); moved.push(famShow(o)); } });
     if (gid && !FAM[gid].s[sk]) gSurnameRaw(gid, sk, true);
     return moved;
   }
@@ -1369,7 +1452,7 @@
   function snHTML(r) {
     const wl = Object.keys(r.w).sort((a, b) => a - b).map(w => `W${w}`).join(' ');
     return `<button class="sn-row" data-sn="${esc(r.k)}"><div class="sn-main"><div class="sn-te">${esc(r.te)}</div><div class="sn-en">${esc(r.en)} · <span>${wl}</span></div>
-      ${r.castes.length ? `<div class="sn-tags">${r.castes.map(gid => `<span class="sn-tag">🏷️ ${esc(famName(gid))}</span>`).join('')}</div>` : ''}</div><span class="sn-n">${r.n}</span></button>`;
+      ${r.castes.length ? `<div class="sn-tags">${r.castes.map(gid => `<span class="sn-tag">🏷️ ${gNameHTML(gid)}</span>`).join('')}</div>` : ''}</div><span class="sn-n">${r.n}</span></button>`;
   }
   // one surname: see its voters, choose its caste
   function showSurname(sk, again) {
@@ -1381,22 +1464,22 @@
       <p class="fam-sub">${sn.n} voters · ${Object.keys(wards).sort((a, b) => a - b).map(w => `W${w}: ${wards[w]}`).join(', ')}</p>
       <button class="btn primary w100" id="snSee">See the ${sn.n} voters</button>
       <h3>Caste</h3>
-      <div class="fam-dd">${castes.map(gid => FAM[gid].s[sk] ? `<button class="fam-chip on" data-sc="${gid}">✓ 🏷️ ${esc(famName(gid))}</button>` : `<button class="fam-chip" data-sc="${gid}">🏷️ ${esc(famName(gid))}</button>`).join('')}
+      <div class="fam-dd">${castes.map(gid => FAM[gid].s[sk] ? `<button class="fam-chip on" data-sc="${gid}">✓ 🏷️ ${gNameHTML(gid)}</button>` : `<button class="fam-chip" data-sc="${gid}">🏷️ ${gNameHTML(gid)}</button>`).join('')}
         <button class="fam-chip add" id="snNewC">＋ New caste</button></div>
       <p class="hint">${castes.length ? 'Tap a caste to put everyone with this surname in it. A surname can be in one caste; tap the ticked one to take it out. You can still take out or add single people from the caste screen.' : 'Make a caste group first.'}</p>
-      ${fams.length ? `<h3>Also in families</h3><div class="fam-dd">${fams.map(gid => `<button class="fam-chip" data-fo="${gid}">👪 ${esc(famName(gid))}</button>`).join('')}</div>` : ''}
+      ${fams.length ? `<h3>Also in families</h3><div class="fam-dd">${fams.map(gid => `<button class="fam-chip" data-fo="${gid}">👪 ${gNameHTML(gid)}</button>`).join('')}</div>` : ''}
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
     box.querySelector('#fpClose').onclick = () => closeTop();
     box.querySelector('#snSee').onclick = () => { S.surname = sk; S.view = 'list'; S.ward = 0; q.value = ''; S.q = ''; $('#clearQ').hidden = true; closeTop(open.length); update(); };
     box.querySelector('#snNewC').onclick = async () => {
       const name = await askName({ title: 'New caste', sub: `Everyone with the surname <b>${esc(sn.en)}</b> (${sn.n}) will be in it.`, t: 'caste' }); if (!name) return;
-      const gid = famNew(name, 'caste'), moved = setCaste(sk, gid); famChanged(); toast(moved.length ? `${sn.en} moved from ${moved.join(', ')} to ${famName(gid)}` : `${sn.en} → ${famName(gid)}`); showSurname(sk, true);
+      const gid = famNew(name, 'caste'), moved = setCaste(sk, gid); famChanged(); toast(moved.length ? `${sn.en} moved from ${moved.join(', ')} to ${famShow(gid)}` : `${sn.en} → ${famShow(gid)}`); showSurname(sk, true);
     };
     box.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => {
       const gid = b.dataset.sc;
-      if (FAM[gid].s[sk]) { gSurnameRaw(gid, sk, false); famChanged(); toast(`${sn.en} taken out of ${famName(gid)}`); }
-      else { const moved = setCaste(sk, gid); famChanged(); toast(moved.length ? `${sn.en} moved from ${moved.join(', ')} to ${famName(gid)}` : `${sn.en} → ${famName(gid)}`); }
+      if (FAM[gid].s[sk]) { gSurnameRaw(gid, sk, false); famChanged(); toast(`${sn.en} taken out of ${famShow(gid)}`); }
+      else { const moved = setCaste(sk, gid); famChanged(); toast(moved.length ? `${sn.en} moved from ${moved.join(', ')} to ${famShow(gid)}` : `${sn.en} → ${famShow(gid)}`); }
       showSurname(sk, true);
     });
     box.querySelectorAll('[data-fo]').forEach(b => b.onclick = () => showFam(b.dataset.fo));
@@ -1411,7 +1494,7 @@
       <button class="btn primary w100" id="bsNew">＋ New caste with these surnames</button>
       ${castes.length ? `<h3>Your castes</h3><div class="picker-list fp-list">${castes.map(gid => {
         const inN = ks.filter(k => FAM[gid].s[k]).length, all = inN === n;
-        return `<button class="opt ${all ? 'sel' : ''}" data-bc="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}🏷️ ${esc(famName(gid))}</div>
+        return `<button class="opt ${all ? 'sel' : ''}" data-bc="${gid}"><div class="o-main"><div class="o-te">${all ? '✓ ' : ''}🏷️ ${gNameHTML(gid)}</div>
           <div class="o-en">${Object.keys(FAM[gid].s).length} surname${Object.keys(FAM[gid].s).length === 1 ? '' : 's'} · ${gMembers(gid).size} voters${inN ? ` · ${inN} of these already in` : ''}</div></div><span class="o-n">${all ? 'Take out' : 'Set'}</span></button>`;
       }).join('')}</div>` : ''}
       <button class="btn w100" id="bsNone" style="margin-top:10px">Remove these from every caste</button>
@@ -1421,14 +1504,14 @@
     box.querySelector('#bsNew').onclick = async () => {
       const name = await askName({ title: 'New caste', sub: `With the ${n} selected surname${n === 1 ? '' : 's'}`, t: 'caste' }); if (!name) return;
       const gid = famNew(name, 'caste'); ks.forEach(k => setCaste(k, gid)); famChanged();
-      toast(`${famName(gid)}: ${n} surnames`); leaveSelect();
+      toast(`${famShow(gid)}: ${n} surnames`); leaveSelect();
     };
     box.querySelector('#bsNone').onclick = () => { ks.forEach(k => setCaste(k, '')); famChanged(); toast(`${n} surnames taken out of castes`); leaveSelect(); };
     box.querySelectorAll('[data-bc]').forEach(b => b.onclick = () => {
       const gid = b.dataset.bc, all = ks.every(k => FAM[gid].s[k]);
-      if (all) { ks.forEach(k => gSurnameRaw(gid, k, false)); famChanged(); toast(`${n} surnames taken out of ${famName(gid)}`); showBulkSnPick(true); return; }
+      if (all) { ks.forEach(k => gSurnameRaw(gid, k, false)); famChanged(); toast(`${n} surnames taken out of ${famShow(gid)}`); showBulkSnPick(true); return; }
       let moved = 0; ks.forEach(k => { if (setCaste(k, gid).length) moved++; }); famChanged();
-      toast(`${n} surnames → ${famName(gid)}${moved ? ` (${moved} moved from another caste)` : ''}`); leaveSelect();
+      toast(`${n} surnames → ${famShow(gid)}${moved ? ` (${moved} moved from another caste)` : ''}`); leaveSelect();
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
@@ -1585,7 +1668,7 @@
       sub = snTxt ? `Surnames: ${snTxt}` : '';
     }
     const head = `<div class="house-h fh" data-gk="${g.gid}" data-acc="${g.gid}" role="button" aria-expanded="${isOpen}"><i class="acc-chev">▸</i>${pic}
-      <span class="fh-t"><b>${esc(g.name)}${fam && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${sub ? `<em class="fh-sub">${sub}</em>` : ''}</span>${cnt}</div>`;
+      <span class="fh-t"><b>${gNameHTML(g.gid)}${fam && isReviewed(g.gid) ? ' <em class="rev-tag">✓ Reviewed</em>' : ''}</b>${sub ? `<em class="fh-sub">${sub}</em>` : ''}</span>${cnt}</div>`;
     if (!isOpen) return `<div class="house fam acc" data-acc-card="${g.gid}">${head}${nav}</div>`;
     return `<div class="house fam acc open" data-acc-card="${g.gid}">${head}${nav}
       ${fam && sn.length ? `<div class="g-sn">Surnames: ${snTxt}</div>` : ''}
@@ -1608,7 +1691,7 @@
     };
     return `<div class="cf-sum">${fams.length} famil${fams.length === 1 ? 'y' : 'ies'}${none.length ? ` · ${none.length} not in a family` : ''}</div>` +
       fams.map(([fid, vs]) => { const hd = headOf(fid), hv = hd && hd.v;
-        return sub(fid, hv ? photo(hv, 'fh-ph sm') : '<div class="ph fh-ph sm"></div>', `👪 ${esc(famName(fid))}`, hv ? `👑 ${esc(hv.name_en || hv.name)}` : '', orderMembers(fid, vs), gMembers(fid).size); }).join('') +
+        return sub(fid, hv ? photo(hv, 'fh-ph sm') : '<div class="ph fh-ph sm"></div>', `👪 ${gNameHTML(fid)}`, hv ? `👑 ${esc(hv.name_en || hv.name)}` : '', orderMembers(fid, vs), gMembers(fid).size); }).join('') +
       (none.length ? sub('none', '<div class="fh-ph sm fh-ic">👤</div>', 'Not in a family', '', [...none].sort(byFamily), 0) : '');
   }
   function memberHTML(v) {
@@ -1662,14 +1745,14 @@
       <p class="fam-sub">${list.length ? `${list.length} voter${list.length === 1 ? ' is' : 's are'} in more than one family. Tap the family each one belongs to; they are taken out of the others.` : '🎉 Every voter is in one family at most.'}</p>
       ${list.length ? `<div class="house">${list.slice(0, 100).map(v => `<div class="dup-row"><button class="member" data-open="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(v.name || '—')}</div>${wardPill(v)}</div>
         <div class="en">${esc(v.name_en)} · House ${esc(v.house_no || '—')}</div></div></button>
-        <div class="fam-dd">${familiesOf(v.id).map(gid => `<button class="fam-chip add" data-keep="${gid}" data-vid="${v.id}">Keep in ${esc(famName(gid))}</button>`).join('')}</div></div>`).join('')}</div>` : ''}
+        <div class="fam-dd">${familiesOf(v.id).map(gid => `<button class="fam-chip add" data-keep="${gid}" data-vid="${v.id}">Keep in ${gNameHTML(gid)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
     box.querySelector('#fpClose').onclick = () => closeTop();
     box.querySelectorAll('[data-open]').forEach(b => b.onclick = () => showDetail(b.dataset.open));
     box.querySelectorAll('[data-keep]').forEach(b => b.onclick = () => {
       const gid = b.dataset.keep, from = leaveOtherFamilies(gid, b.dataset.vid); famChanged();
-      toast(`Kept in ${famName(gid)}, taken out of ${from.map(famName).join(', ')}`); showDupFix(true);
+      toast(`Kept in ${famShow(gid)}, taken out of ${from.map(famShow).join(', ')}`); showDupFix(true);
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
@@ -1694,7 +1777,7 @@
     const LIMIT = 60;
     const row = (v, extra, btn) => `<div class="fam-row"><button class="member" data-open="${v.id}">${photo(v)}<div class="m-body"><div class="nm-row"><div class="nm">${esc(v.name || '—')}</div>${wardPill(v)}</div>
       <div class="en">${esc(v.name_en)} · ${extra}</div></div></button>${btn}</div>`;
-    $('#fam').innerHTML = `<h2>${GT[t].icon} ${esc(famName(gid))}</h2>
+    $('#fam').innerHTML = `<h2>${GT[t].icon} ${gNameHTML(gid)}</h2>
       <p class="fam-sub">${GT[t].label} group · ${mem.length.toLocaleString()} voter${mem.length === 1 ? '' : 's'}${mem.length ? ' · ' + Object.keys(wards).sort((a, b) => a - b).map(w => `W${w}: ${wards[w]}`).join(', ') : ''}</p>
       ${t === 'family' ? (isReviewed(gid)
         ? `<div class="rev-box done"><span>✓ Reviewed${g.r ? ' by ' + esc(g.r) : ''}</span><button class="btn" id="fUnrev">Undo</button>${nextUnreviewed(gid) ? '<button class="btn primary" id="fNext">Next ›</button>' : ''}</div>`
@@ -1728,7 +1811,7 @@
     box.querySelector('#fClose').onclick = () => closeTop();
     box.querySelector('#fShow').onclick = () => showGroupInList(gid);
     const on = (id, fn) => { const b = box.querySelector(id); if (b) b.onclick = fn; };
-    on('#fSlip', () => showSlips(mem, famName(gid)));
+    on('#fSlip', () => showSlips(mem, famTe(gid) || famName(gid)));
     on('#fRev', () => { setReviewed(gid, true); showFam(gid, true); toast('Family marked reviewed'); });
     on('#fUnrev', () => { setReviewed(gid, false); showFam(gid, true); });
     on('#fNext', () => { const n = nextUnreviewed(gid); if (n) { showFam(n, true); $('#famSheet').scrollTop = 0; } });
@@ -1741,7 +1824,7 @@
     };
     box.querySelector('#fDelete').onclick = async () => {
       const nm = gMembers(gid).size;
-      if (!await askSure({ title: `Delete “${famName(gid)}”?`, ok: 'Delete', danger: true,
+      if (!await askSure({ title: `Delete “${famShow(gid)}”?`, ok: 'Delete', danger: true,
         body: `<p>This ${GT[t].label.toLowerCase()} and its list of ${nm} voter${nm === 1 ? '' : 's'} are removed${cloud.code ? ' for everyone using your sync code' : ''}. The voters themselves are not deleted.</p>` }) || !FAM[gid]) return;
       delete FAM[gid]; cloud.put('G', gid, null); if (S.cgrp === gid) S.cgrp = ''; S.fsel = S.fsel.filter(x => x !== gid); if (S.fgrp === 'sel' && !S.fsel.length) S.fgrp = ''; famChanged(); closeTop(); toast('Group deleted');
     };
@@ -1772,14 +1855,14 @@
     const curFam = familiesOf(vid);
     const castesL = list.filter(gid => gType(gid) === 'caste');   // whole-surname adding is for castes only (it added people to families by accident)
     const rowP = gid => { const on = inGroup(gid, vid), mv = !on && gType(gid) === 'family' && curFam.length; return `<button class="opt ${on ? 'sel' : ''}" data-g="${gid}">
-      <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${esc(gLabel(gid))}</div><div class="o-en">${!on && recentRank(gid) < 99 ? '<b class="recent">🕘 Recent</b> · ' : ''}${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : mv ? 'Move here' : 'Add'}</span></button>`; };
+      <div class="o-main"><div class="o-te">${on ? '✓ ' : ''}${gLabelHTML(gid)}</div><div class="o-en">${!on && recentRank(gid) < 99 ? '<b class="recent">🕘 Recent</b> · ' : ''}${GT[gType(gid)].label} · ${gMembers(gid).size} voters</div></div><span class="o-n">${on ? 'Remove' : mv ? 'Move here' : 'Add'}</span></button>`; };
     $('#famPick').innerHTML = `<h2>Add to group</h2><p class="fam-sub">${esc(v.name)} · ${esc(v.name_en)}</p>
       ${curFam.length ? `<p class="hint">A voter can be in one family only. Choosing another family moves them out of ${esc(curFam.map(famName).join(', '))}.</p>` : ''}
       ${fpSearchHTML(list.length)}
       ${list.length ? `<h3>Add this person</h3><div class="picker-list fp-list">${list.map(rowP).join('')}</div>` : '<p class="hint">No groups yet. Make one below.</p>'}
       <div class="d-actions fp-new"><button class="btn" id="fpNewF">＋ New family</button><button class="btn" id="fpNewC">＋ New caste</button></div>
       ${castesL.length && sn ? `<h3>Add everyone named ${esc(sn.en)} (${sn.n}) to a caste</h3><div class="fam-dd">${castesL.map(gid => FAM[gid].s[sk]
-        ? `<button class="fam-chip" data-gs="${gid}">✓ ${esc(gLabel(gid))}</button>` : `<button class="fam-chip add" data-gs="${gid}">＋ ${esc(gLabel(gid))}</button>`).join('')}</div>
+        ? `<button class="fam-chip" data-gs="${gid}">✓ ${gLabelHTML(gid)}</button>` : `<button class="fam-chip add" data-gs="${gid}">＋ ${gLabelHTML(gid)}</button>`).join('')}</div>
         <p class="hint">Adds the whole surname to the group, including people added to the roll later.</p>` : ''}
       <div class="sheet-actions"><button class="btn" id="fpClose">Done</button></div>`;
     const box = $('#famPick');
@@ -1790,12 +1873,12 @@
     box.querySelector('#fpNewC').onclick = () => famCreate('caste', vid);
     box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
       const gid = b.dataset.g, on = !inGroup(gid, vid);
-      if (on) toast(addedMsg(gid, gAddVoter(gid, vid))); else { gRemoveVoter(gid, vid); toast(`Removed from ${famName(gid)}`); }
+      if (on) toast(addedMsg(gid, gAddVoter(gid, vid))); else { gRemoveVoter(gid, vid); toast(`Removed from ${famShow(gid)}`); }
       showFamPick(vid, true);
     });
     box.querySelectorAll('[data-gs]').forEach(b => b.onclick = () => {
       const gid = b.dataset.gs, on = !FAM[gid].s[sk];
-      gSurname(gid, sk, on); toast(on ? `All ${sn.en} added to ${famName(gid)}` : `${sn.en} removed from ${famName(gid)}`); showFamPick(vid, true);
+      gSurname(gid, sk, on); toast(on ? `All ${sn.en} added to ${famShow(gid)}` : `${sn.en} removed from ${famShow(gid)}`); showFamPick(vid, true);
     });
     if (!again && !raise('#famPickSheet')) openSheet('#famPickSheet');
   }
@@ -1861,13 +1944,13 @@
     } else if (o.layout === 'slips') {
       const ws = [...new Set(groups.flatMap(g => g.items.map(v => v.ward)))].sort((a, b) => a - b);
       body = prHeadTe(ws) + groups.map(g => {
-        const head = S.view === 'house' ? (([w, h]) => `Ward ${w} · House ${esc(h)}`)(g.key.split('|')) : `${esc(g.name)}`;
+        const head = S.view === 'house' ? (([w, h]) => `Ward ${w} · House ${esc(h)}`)(g.key.split('|')) : `${gNameHTML(g.gid)}`;
         return `<div class="ps-g"><div class="ps-gh">${head} — ${g.items.length} voter${g.items.length === 1 ? '' : 's'}</div><div class="ps-grid">${g.items.map(v => prSlip(v, o, ws.length > 1)).join('')}</div></div>`;
       }).join('');
     } else {
       const cols = 10 + (o.photos ? 1 : 0) + (o.phones ? 1 : 0); let k = 0;
       body = `<table class="pr-t">${prVoterHead(o)}<tbody>${groups.map(g => {
-        const head = S.view === 'house' ? (([w, h]) => `Ward ${w} · House ${esc(h)}`)(g.key.split('|')) : `${esc(g.name)}`;
+        const head = S.view === 'house' ? (([w, h]) => `Ward ${w} · House ${esc(h)}`)(g.key.split('|')) : `${gNameHTML(g.gid)}`;
         const rows = prVoterRows(g.items, o, k); k += g.items.length;
         return `<tr class="pr-g"><td colspan="${cols}">${head} — ${g.items.length} voter${g.items.length === 1 ? '' : 's'}</td></tr>${rows}`;
       }).join('')}</tbody></table>`;
