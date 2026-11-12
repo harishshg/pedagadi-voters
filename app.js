@@ -610,7 +610,7 @@
   // one PNG laid out like the ward PDF: page header, then a box per voter (1 column for one voter, 2 for more)
   const CASTE_TE = { SC: 'షె.కు.', ST: 'షె.తె.', BC: 'వె.త.' };
   const REL_TE = { Father: 'తండ్రి పేరు', Husband: 'భర్త పేరు', Mother: 'తల్లి పేరు', Wife: 'భార్య పేరు' };
-  async function slipImage(vs, title, part) {
+  async function slipImage(vs, title, part, type = 'image/png') {
     try { await document.fonts.ready; } catch { }
     const cols = vs.length > 1 ? 2 : 1, rows = Math.ceil(vs.length / cols);
     const S = cols === 1 ? 6 : 4;                      // canvas pixels per PDF point
@@ -680,9 +680,31 @@
     const fy = H - M - 2;
     runs([[() => TE(400, FL), 'వయస్సు లెక్కింపు తేదీ : '], [() => NUM(FN), '01-01-2026']], L, two ? fy - 7 : fy);
     runs([[() => TE(400, FL), 'ప్రచురణ తేదీ : '], [() => NUM(FN), '15-04-2026']], R - fw, fy);
-    return new Promise(res => cv.toBlob(res, 'image/png'));
+    return new Promise(res => cv.toBlob(b => { if (b) { b.w = cv.width; b.h = cv.height; } res(b); }, type, 0.85));
   }
-  const slipFileName = (vs, title, part) => (title ? title.replace(/[^\wఀ-౿ -]+/g, '').trim().replace(/\s+/g, '-') + '-voter-slips' : `voter-slip-${vs[0].epic || vs[0].id}`) + (part ? `-${part.replace(/\D+/g, '-').replace(/^-|-$/g, '')}` : '') + '.png';
+  // a minimal PDF: one JPEG per page (A4 width), so many slips go to WhatsApp as one small file
+  async function jpegsToPdf(imgs) {
+    const enc = new TextEncoder(), chunks = [], offs = [];
+    let len = 0;
+    const push = d => { const u = typeof d === 'string' ? enc.encode(d) : d; chunks.push(u); len += u.length; };
+    const obj = (n, body) => { offs[n] = len; push(`${n} 0 obj\n`); body(); push('\nendobj\n'); };
+    const n = imgs.length, size = 3 + 3 * n;
+    push('%PDF-1.4\n%âãÏÓ\n');
+    obj(1, () => push('<< /Type /Catalog /Pages 2 0 R >>'));
+    obj(2, () => push(`<< /Type /Pages /Count ${n} /Kids [${imgs.map((_, i) => `${3 + 3 * i} 0 R`).join(' ')}] >>`));
+    for (let i = 0; i < n; i++) {
+      const b = imgs[i], data = new Uint8Array(await b.arrayBuffer());
+      const pw = 595, ph = +(595 * b.h / b.w).toFixed(2), cs = `q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do Q`;
+      obj(3 + 3 * i, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 ${5 + 3 * i} 0 R >> >> /Contents ${4 + 3 * i} 0 R >>`));
+      obj(4 + 3 * i, () => push(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`));
+      obj(5 + 3 * i, () => { push(`<< /Type /XObject /Subtype /Image /Width ${b.w} /Height ${b.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${data.length} >>\nstream\n`); push(data); push('\nendstream'); });
+    }
+    const xref = len;
+    push(`xref\n0 ${size}\n0000000000 65535 f \n` + offs.slice(1).map(o => String(o).padStart(10, '0') + ' 00000 n \n').join(''));
+    push(`trailer\n<< /Size ${size} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(chunks, { type: 'application/pdf' });
+  }
+  const slipFileName = (vs, title, part, ext = 'png') => (title ? title.replace(/[^\wఀ-౿ -]+/g, '').trim().replace(/\s+/g, '-') + '-voter-slips' : `voter-slip-${vs[0].epic || vs[0].id}`) + (part ? `-${part.replace(/\D+/g, '-').replace(/^-|-$/g, '')}` : '') + '.' + ext;
   const SLIPS_PER_IMAGE = 12;
   const famSlipVoters = gid => [...gMembers(gid).keys()].map(id => byId.get(id)).filter(Boolean).sort((a, b) => a.ward - b.ward || a.serial - b.serial);
   // open the slip sheet for one voter or a family; title = family name (or '' for one voter)
@@ -694,7 +716,8 @@
     if (!vs.length) { toast('No voters to share (all are marked dead or duplicate)'); return; }
     const token = {}; $('#slipSheet')._token = token;
     $('#slipTitle').textContent = vs.length > 1 ? 'Voter slips' : 'Voter slip';
-    $('#slipSub').textContent = (title ? `${title} · ${vs.length} voter${vs.length === 1 ? '' : 's'}${vs.length > SLIPS_PER_IMAGE ? ` · ${Math.ceil(vs.length / SLIPS_PER_IMAGE)} images` : ''}` : `${vs[0].name_en} · Ward ${vs[0].ward} · Serial ${vs[0].serial}`)
+    const asPdf = vs.length > SLIPS_PER_IMAGE;
+    $('#slipSub').textContent = (title ? `${title} · ${vs.length} voter${vs.length === 1 ? '' : 's'}${asPdf ? ` · 1 PDF, ${Math.ceil(vs.length / SLIPS_PER_IMAGE)} pages` : ''}` : `${vs[0].name_en} · Ward ${vs[0].ward} · Serial ${vs[0].serial}`)
       + (left ? ` · ${left} dead / duplicate left out` : '') + (vs.length === 1 && isGone(vs[0].id) ? ` · marked ${statusOf(vs[0].id).k === 'dead' ? 'dead' : 'duplicate'}` : '');
     const prev = $('#slipPrev'), imgBtn = $('#slipImg');
     prev.innerHTML = '<p class="hint" style="margin:8px">Making the slip…</p>'; imgBtn.disabled = true;
@@ -728,31 +751,39 @@
     // build the images now, so the share button works straight away when tapped
     const parts = [];
     for (let i = 0; i < vs.length; i += SLIPS_PER_IMAGE) parts.push(vs.slice(i, i + SLIPS_PER_IMAGE));
-    const files = [];
+    // up to 12 voters: one PNG image; more: one PDF with 12 voters a page (JPEG pages keep it small)
+    const imgs = [];
     for (let i = 0; i < parts.length; i++) {
-      const part = parts.length > 1 ? `part ${i + 1} of ${parts.length}` : '';
-      const blob = await slipImage(parts[i], title, part);
+      if (asPdf) prev.innerHTML = `<p class="hint" style="margin:8px">Making the PDF… page ${i + 1} of ${parts.length}</p>`;
+      const part = parts.length > 1 ? `page ${i + 1} of ${parts.length}` : '';
+      const blob = await slipImage(parts[i], title, part, asPdf ? 'image/jpeg' : 'image/png');
       if ($('#slipSheet')._token !== token) return;  // another slip was opened meanwhile
-      if (!blob) continue;
-      files.push(new File([blob], slipFileName(parts[i], title, part), { type: 'image/png' }));
+      if (blob) imgs.push(blob);
     }
-    if (!files.length) { prev.innerHTML = '<p class="hint" style="margin:8px">Could not make the image. Send as text instead.</p>'; return; }
+    if (!imgs.length) { prev.innerHTML = '<p class="hint" style="margin:8px">Could not make the image. Send as text instead.</p>'; return; }
+    const files = asPdf
+      ? [new File([await jpegsToPdf(imgs)], slipFileName(vs, title, '', 'pdf'), { type: 'application/pdf' })]
+      : [new File([imgs[0]], slipFileName(vs, title, ''), { type: 'image/png' })];
+    if ($('#slipSheet')._token !== token) return;
     (prev._urls || []).forEach(u => URL.revokeObjectURL(u));
-    prev._urls = files.map(f => URL.createObjectURL(f));
+    prev._urls = imgs.map(b => URL.createObjectURL(b));
     prev.innerHTML = prev._urls.map(u => `<img src="${u}" alt="Voter slip preview">`).join('');
+    const fileUrl = asPdf ? URL.createObjectURL(files[0]) : prev._urls[0];
+    if (asPdf) prev._urls.push(fileUrl);
+    const what = asPdf ? `slips PDF (${vs.length} voters, ${(files[0].size / 1048576).toFixed(1)} MB)` : 'slip image';
     const canFiles = !!(navigator.canShare && navigator.canShare({ files }));
     imgBtn.disabled = false;
-    imgBtn.querySelector('span').textContent = canFiles ? `Share slip${vs.length > 1 ? 's' : ''} image${files.length > 1 ? 's' : ''}` : `Download slip image${files.length > 1 ? 's' : ''}`;
+    imgBtn.querySelector('span').textContent = `${canFiles ? 'Share' : 'Download'} ${what}`;
     $('#slipHint').textContent = canFiles ? 'Tap the green button, then choose WhatsApp and the person to send it to.'
-      : 'This browser can’t share images directly. Download the image, then attach it in WhatsApp — or send the slip as text.';
+      : `This browser can’t share ${asPdf ? 'files' : 'images'} directly. Download it, then attach it in WhatsApp — or send the slip as text.`;
     imgBtn.onclick = async () => {
       if (canFiles) {
         try { await navigator.share({ files, title: title ? `${title} – voter slips` : `Voter slip – ${vs[0].name_en}` }); }
         catch (e) { if (e && e.name !== 'AbortError') toast('Sharing failed. Try “Send as text”.'); }
         return;
       }
-      files.forEach((f, i) => { const a = document.createElement('a'); a.href = prev._urls[i]; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
-      toast(files.length > 1 ? 'Images saved. Attach them in WhatsApp.' : 'Image saved. Attach it in WhatsApp.');
+      const a = document.createElement('a'); a.href = fileUrl; a.download = files[0].name; document.body.appendChild(a); a.click(); a.remove();
+      toast(`${asPdf ? 'PDF' : 'Image'} saved. Attach it in WhatsApp.`);
     };
   }
   // ---------- voice message: record once on this device, share it to WhatsApp with the slips ----------
